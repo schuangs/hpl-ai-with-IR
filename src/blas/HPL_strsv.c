@@ -492,23 +492,23 @@ void HPL_strsv
    cdiag = ( DIAG == HplNonUnit ? 'N' : 'U' );
 
 #ifdef StringSunStyle
-   F77dtrsv( &cuplo, &ctran, &cdiag, &F77N, A, &F77lda, X, &F77incx,
+   strsv_( &cuplo, &ctran, &cdiag, &F77N, A, &F77lda, X, &F77incx,
              IONE, IONE, IONE );
 #endif
 #ifdef StringCrayStyle
    ftran = HPL_C2F_CHAR( ctran ); fdiag = HPL_C2F_CHAR( cdiag );
    fuplo = HPL_C2F_CHAR( cuplo );
-   F77dtrsv( fuplo,  ftran,  fdiag,  &F77N, A, &F77lda, X, &F77incx );
+   strsv_( fuplo,  ftran,  fdiag,  &F77N, A, &F77lda, X, &F77incx );
 #endif
 #ifdef StringStructVal
    fuplo.len = 1; fuplo.cp = &cuplo; ftran.len = 1; ftran.cp = &ctran;
    fdiag.len = 1; fdiag.cp = &cdiag;
-   F77dtrsv( fuplo,  ftran,  fdiag,  &F77N, A, &F77lda, X, &F77incx );
+   strsv_( fuplo,  ftran,  fdiag,  &F77N, A, &F77lda, X, &F77incx );
 #endif
 #ifdef StringStructPtr
    fuplo.len = 1; fuplo.cp = &cuplo; ftran.len = 1; ftran.cp = &ctran;
    fdiag.len = 1; fdiag.cp = &cdiag;
-   F77dtrsv( &fuplo, &ftran, &fdiag, &F77N, A, &F77lda, X, &F77incx );
+   strsv_( &fuplo, &ftran, &fdiag, &F77N, A, &F77lda, X, &F77incx );
 #endif
 
 #endif

@@ -128,10 +128,10 @@ void HPL_pdgesv0
  * allocate space for precondition matrix
  */
    vL = (void*)malloc( ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld) * (size_t)(nq) ) *
+                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
                          sizeof(double) );
    vU = (void*)malloc( ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld) * (size_t)(nq) ) *
+                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
                          sizeof(double) );
    inv_info[0] = (invptrL == NULL || invptrU == NULL); inv_info[1] = GRID->myrow; inv_info[2] = GRID->mycol;
    (void) HPL_all_reduce( (void *)(inv_info), 3, HPL_INT, HPL_max,

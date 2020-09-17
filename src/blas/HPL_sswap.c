@@ -147,7 +147,7 @@ void HPL_sswap
 #define F77incx              INCX
 #define F77incy              INCY
 #endif
-   F77dswap( &F77N, X, &F77incx, Y, &F77incy );
+   sswap_( &F77N, X, &F77incx, Y, &F77incy );
 #endif
 /*
  * End of HPL_sswap

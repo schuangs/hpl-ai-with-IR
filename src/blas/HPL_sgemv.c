@@ -274,22 +274,22 @@ void HPL_sgemv
       ctran = ( TRANS == HplNoTrans ? 'N' : 'T' );
 
 #ifdef StringSunStyle
-      F77dgemv( &ctran, &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( &ctran, &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy, IONE );
 #endif
 #ifdef StringCrayStyle
       ftran = HPL_C2F_CHAR( ctran );
-      F77dgemv( ftran,  &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( ftran,  &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
 #ifdef StringStructVal
       ftran.len = 1; ftran.cp = &ctran;
-      F77dgemv( ftran,  &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( ftran,  &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
 #ifdef StringStructPtr
       ftran.len = 1; ftran.cp = &ctran;
-      F77dgemv( &ftran, &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( &ftran, &F77M, &F77N, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
    }
@@ -297,22 +297,22 @@ void HPL_sgemv
    {
       ctran = ( TRANS == HplNoTrans ? 'T' : 'N' );
 #ifdef StringSunStyle
-      F77dgemv( &ctran, &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( &ctran, &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy, IONE );
 #endif
 #ifdef StringCrayStyle
       ftran = HPL_C2F_CHAR( ctran );
-      F77dgemv( ftran,  &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( ftran,  &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
 #ifdef StringStructVal
       ftran.len = 1; ftran.cp = &ctran;
-      F77dgemv( ftran,  &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( ftran,  &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
 #ifdef StringStructPtr
       ftran.len = 1; ftran.cp = &ctran;
-      F77dgemv( &ftran, &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
+      sgemv_( &ftran, &F77N, &F77M, &alpha, A, &F77lda, X, &F77incx,
                 &beta, Y, &F77incy );
 #endif
    }

@@ -169,7 +169,7 @@ void HPL_sscal
 #define F77incx              INCX
 #endif
 
-   F77dscal( &F77N, &alpha, X, &F77incx );
+   sscal_( &F77N, &alpha, X, &F77incx );
 #endif
 /*
  * End of HPL_dscal

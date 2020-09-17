@@ -10,7 +10,7 @@
 
 
 #define IR 5
-   
+
 #ifdef STDC_HEADERS
 void HPL_pir
 (
@@ -76,24 +76,11 @@ void HPL_pir
    Bptr1 = Mptr( A->A,  0, nq,   A->ld);
 
 /*
- * Convert initial solution ( which is obtained through lower precision 
- * LU factorization) into higher precision
- */
-   for(i = 0; i < nq; ++i)
-   {
-      *(A->X + i) = (double)(*(FA->X + i));
-   }
-/*
- * tarcol is the process column containing b in [ A | b ]
- */
-   tarcol = HPL_indxg2p( n, nb, nb, 0, npcol );
-
-/*
  * allocate  space for factors, which  contains LU factors of  lower 
- * precision while stored in double precision space.
+ * precision and needed to be stored in double precision space.
  */
    vF = (void*)malloc( ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld) * (size_t)(nq) ) *
+                           (size_t)(A->ld + 1) * (size_t)(nq+1) ) *
                          sizeof(double) );
    info[0] = (vF == NULL); info[1] = myrow; info[2] = mycol;
    (void) HPL_all_reduce( (void *)(info), 3, HPL_INT, HPL_max,
@@ -116,9 +103,22 @@ void HPL_pir
    {
       for (j = 0; j < nq; ++j)
       {
-         *Mptr(factors, i, j, A->ld) = (double)*Mptr(FA->A, i, j, A->ld);
+         *Mptr(factors, i, j, A->ld) = (double)*Mptr(FA->A, i, j, FA->ld);
       }
    }
+/*
+ * Convert initial solution ( which is obtained through lower precision 
+ * LU factorization) into higher precision
+ */
+   for(i = 0; i < nq; ++i)
+   {
+      *(A->X + i) = (double)(*(FA->X + i));
+   }
+
+/*
+ * tarcol is the process column containing b in [ A | b ]
+ */
+   tarcol = HPL_indxg2p( n, nb, nb, 0, npcol );
 
 /*
  * Iterative Refinement
@@ -129,30 +129,43 @@ void HPL_pir
       if( mycol ==  tarcol)
       {
          memcpy(Bptr1,Bptr,A->mp*sizeof(double));
-         HPL_dgemv( HplColumnMajor, HplNoTrans, A->mp, nq, -HPL_rone,
+         HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, -HPL_rone,
                   A->A, A->ld, A->X, 1, HPL_rone, Bptr1, 1 );
       }
-      else
+      else if( nq > 0 )
       {
-         HPL_dgemv( HplColumnMajor, HplNoTrans, A->mp, nq, -HPL_rone,
+         HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, -HPL_rone,
                   A->A, A->ld, A->X, 1, HPL_rzero, Bptr1, 1 );
       }
-      HPL_all_reduce( Bptr1, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
+      else { for( j = 0; j < mp; j++ ) Bptr1[j] = HPL_rzero; }
+      
+      if (mp > 0)
+         HPL_all_reduce( Bptr1, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
+
+      if (myrow == 0 && mycol == 0)
+      {
+         printf("\n");
+         for (j = 0; j < mp; ++j)
+         {
+            printf("%f, ", *(Bptr1 + j));
+         }
+         printf("\n");
+      }
 
    /* 
     * Solve correction equation using preconditioned GMRES method in mix
     * precision.  And  the  correction vector d will overwrite the space 
     * pointed by Bptr1 .
     */
-      HPL_pgmres(GRID, ALGO, A, factors);
+   //    HPL_pgmres(GRID, ALGO, A, factors);
 
-   /*
-    * update solution
-    */
-      for (j = 0; j < nq; ++j)
-      {
-         *(A->X + j) += *(Bptr1 + j);
-      }
+   // /*
+   //  * update solution
+   //  */
+   //    for (j = 0; j < nq; ++j)
+   //    {
+   //       *(A->X + j) += *(Bptr1 + j);
+   //    }
    }
 
    if (vF) free(vF);

@@ -128,7 +128,7 @@ void HPL_pdtest
    int                        info[3];
    double                     Anorm1, AnormI, Gflops, Xnorm1, XnormI,
                               BnormI, resid0, resid1;
-   double                     * Bptr, * Xptr;
+   double                     * Bptr;
    void                       * vptr = NULL;
    static int                 first=1;
    int                        ii, ip2, mycol, myrow, npcol, nprow, nq;
@@ -207,15 +207,18 @@ void HPL_pdtest
       (TEST->kskip)++;
       /* some processes might have succeeded with allocation */
       if (fptr) free(fptr);
+      if (vptr) free(vptr);
       return;
    }
-   
    if(dev) printf("-Start double to float\n");
    matt.A  = (float *)HPL_PTR( fptr,((size_t)(ALGO->align) * sizeof(float) ) );
    matt.X  = Mptr( matt.A, 0, matt.nq, matt.ld );
-   int sizeA = mat.nq*(mat.ld+1);
+   int sizeA = matt.nq*matt.ld;
    for(int i=0;i<sizeA;++i){
       *(matt.A+i)=(float)*(mat.A+i);
+   }
+   for(int i=0;i<matt.nq;++i){
+      *(matt.X+i)=(float)*(mat.X+i);
    }
    if(dev) printf("-End double to float\n");
 
@@ -230,7 +233,6 @@ void HPL_pdtest
    HPL_ptimer_boot(); (void) HPL_barrier( GRID->all_comm );
    time( &current_time_start );
    HPL_ptimer( 0 );
-
    /*
     * LU factorization in lower precision, and the solution is stored 
     * in lower precision matt->X
@@ -241,11 +243,27 @@ void HPL_pdtest
     * Iterative refinement in higher precision, and the solution is 
     * stored in highed precision mat->X
     */
-   // HPL_pir( GRID, ALGO, &mat, &matt );
+   HPL_pir( GRID, ALGO, &mat, &matt );
 
+   // if (GRID->myrow == 1 && GRID->mycol == 0)
+   // {
+   //    printf("\n======");
+   //    for (int i = 0; i < matt.mp; ++i)
+   //    {
+   //       printf("\n|");
+   //       for(int j = 0; j < matt.nq+1; ++j)
+   //       {
+   //          if (*Mptr(matt.A, i, j, matt.ld) >= 0)
+   //             printf(" ");
+   //          printf("%8f, ", *Mptr(matt.A, i, j, matt.ld));
+   //       }
+   //       printf("|");
+   //    }
+   //    printf("\n------");
+   // }
+   if(dev) printf("PDGESV Finished, MATT.INFO = %d\n",matt.info);
    HPL_ptimer( 0 );
    time( &current_time_end );
-
 #ifdef HPL_CALL_VSIPL
    (void) vsip_blockrelease_d( matt.block, VSIP_TRUE ); 
    vsip_blockdestroy_d( matt.block );
@@ -386,7 +404,7 @@ void HPL_pdtest
    {
       if( ( myrow == 0 ) && ( mycol == 0 ) )
          HPL_pwarn( TEST->outfp, __LINE__, "HPL_pdtest", "%s %d, %s", 
-                    "Error code returned by solve is", mat.info, "skip" );
+                    "Error code returned by solve is", matt.info, "skip" );
       (TEST->kskip)++;
       if( vptr ){
          free( vptr );
@@ -400,7 +418,17 @@ void HPL_pdtest
       return;
    }
 
+   //Float to double
+   // printf("Come to Float to Double!\n");
+   // int sizeAll = mat.nq * mat.ld;
+   // for(int i=0;i<sizeAll;++i){
+   //    *(mat.A+i)=(double)*(matt.A+i);
+   // }
+   // for(int i=0;i<mat.nq;++i){
+   //    *(mat.X+i)=(double)*(matt.X+i);
+   // }
    if(dev) printf("Mat.A: %lf %lf",*(mat.A),*(mat.X));
+   // printf("Finish Float to Double!\n");
 /*
  * Check computation, re-generate [ A | b ], compute norm 1 and inf of A and x,
  * and norm inf of b - A x. Display residual checks.
@@ -413,8 +441,8 @@ void HPL_pdtest
  * Because x is distributed in process rows, switch the norms
  */
    if(dev) printf("Step2!\n");
-   XnormI = HPL_pdlange( GRID, HPL_NORM_1, 1, N, NB, mat.X, 1 );
-   Xnorm1 = HPL_pdlange( GRID, HPL_NORM_I, 1, N, NB, mat.X, 1 );
+   XnormI = HPL_pdlange( GRID, HPL_NORM_I, 1, N, NB, mat.X, 1 );
+   Xnorm1 = HPL_pdlange( GRID, HPL_NORM_1, 1, N, NB, mat.X, 1 );
 /*
  * If I am in the col that owns b, (1) compute local BnormI, (2) all_reduce to
  * find the max (in the col). Then (3) broadcast along the rows so that every

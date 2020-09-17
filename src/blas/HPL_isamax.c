@@ -156,7 +156,7 @@ int HPL_isamax
 #endif
    int                       imax = 0;
 
-   if( N > 0 ) imax = F77idamax( &F77N, X, &F77incx ) - 1;
+   if( N > 0 ) imax = isamax_( &F77N, X, &F77incx ) - 1;
    return( imax );
 #endif
 /*

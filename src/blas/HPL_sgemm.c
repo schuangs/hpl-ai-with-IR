@@ -467,48 +467,48 @@ void HPL_sgemm
    if( ORDER == HplColumnMajor )
    {
 #ifdef StringSunStyle
-      F77dgemm( &ctransa, &ctransb, &F77M, &F77N, &F77K, &alpha, A, &F77lda,
+      sgemm_( &ctransa, &ctransb, &F77M, &F77N, &F77K, &alpha, A, &F77lda,
                 B, &F77ldb, &beta, C, &F77ldc, IONE, IONE );
 #endif
 #ifdef StringCrayStyle
       ftransa = HPL_C2F_CHAR( ctransa ); ftransb = HPL_C2F_CHAR( ctransb );
-      F77dgemm( ftransa,  ftransb,  &F77M, &F77N, &F77K, &alpha, A, &F77lda,
+      sgemm_( ftransa,  ftransb,  &F77M, &F77N, &F77K, &alpha, A, &F77lda,
                 B, &F77ldb, &beta, C, &F77ldc );
 #endif
 #ifdef StringStructVal
       ftransa.len = 1; ftransa.cp = &ctransa;
       ftransb.len = 1; ftransb.cp = &ctransb;
-      F77dgemm( ftransa,  ftransb,  &F77M, &F77N, &F77K, &alpha, A, &F77lda,
+      sgemm_( ftransa,  ftransb,  &F77M, &F77N, &F77K, &alpha, A, &F77lda,
                 B, &F77ldb, &beta, C, &F77ldc );
 #endif
 #ifdef StringStructPtr
       ftransa.len = 1; ftransa.cp = &ctransa;
       ftransb.len = 1; ftransb.cp = &ctransb;
-      F77dgemm( &ftransa, &ftransb, &F77M, &F77N, &F77K, &alpha, A, &F77lda,
+      sgemm_( &ftransa, &ftransb, &F77M, &F77N, &F77K, &alpha, A, &F77lda,
                 B, &F77ldb, &beta, C, &F77ldc );
 #endif
    }
    else
    {
 #ifdef StringSunStyle
-      F77dgemm( &ctransb, &ctransa, &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
+      sgemm_( &ctransb, &ctransa, &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
                 A, &F77lda, &beta, C, &F77ldc, IONE, IONE );
 #endif
 #ifdef StringCrayStyle
       ftransa = HPL_C2F_CHAR( ctransa ); ftransb = HPL_C2F_CHAR( ctransb );
-      F77dgemm( ftransb,  ftransa,  &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
+      sgemm_( ftransb,  ftransa,  &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
                 A, &F77lda, &beta, C, &F77ldc );
 #endif
 #ifdef StringStructVal
       ftransa.len = 1; ftransa.cp = &ctransa;
       ftransb.len = 1; ftransb.cp = &ctransb;
-      F77dgemm( ftransb,  ftransa,  &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
+      sgemm_( ftransb,  ftransa,  &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
                 A, &F77lda, &beta, C, &F77ldc );
 #endif
 #ifdef StringStructPtr
       ftransa.len = 1; ftransa.cp = &ctransa;
       ftransb.len = 1; ftransb.cp = &ctransb;
-      F77dgemm( &ftransb, &ftransa, &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
+      sgemm_( &ftransb, &ftransa, &F77N, &F77M, &F77K, &alpha, B, &F77ldb,
                 A, &F77lda, &beta, C, &F77ldc );
 #endif
    }

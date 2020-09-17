@@ -165,7 +165,7 @@ void HPL_saxpy
 #define F77incx              INCX
 #define F77incy              INCY
 #endif
-   F77daxpy( &F77N, &alpha, X, &F77incx, Y, &F77incy );
+   saxpy_( &F77N, &alpha, X, &F77incx, Y, &F77incy );
 #endif
 /*
  * End of HPL_daxpy

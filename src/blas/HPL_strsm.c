@@ -919,25 +919,25 @@ void HPL_strsm
       cside = ( SIDE == HplRight ? 'R' : 'L' );
       cuplo = ( UPLO == HplLower ? 'L' : 'U' );
 #ifdef StringSunStyle
-      F77dtrsm( &cside, &cuplo, &ctran, &cdiag, &F77M, &F77N, &alpha,
+      strsm_( &cside, &cuplo, &ctran, &cdiag, &F77M, &F77N, &alpha,
                 A, &F77lda, B, &F77ldb, IONE, IONE, IONE, IONE );
 #endif
 #ifdef StringCrayStyle
       fside = HPL_C2F_CHAR( cside ); fuplo = HPL_C2F_CHAR( cuplo );
       ftran = HPL_C2F_CHAR( ctran ); fdiag = HPL_C2F_CHAR( cdiag );
-      F77dtrsm( fside,  fuplo,  ftran,  fdiag,  &F77M, &F77N, &alpha,
+      strsm_( fside,  fuplo,  ftran,  fdiag,  &F77M, &F77N, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
 #ifdef StringStructVal
       fside.len = 1; fside.cp = &cside; fuplo.len = 1; fuplo.cp = &cuplo;
       ftran.len = 1; ftran.cp = &ctran; fdiag.len = 1; fdiag.cp = &cdiag;
-      F77dtrsm( fside,  fuplo,  ftran,  fdiag,  &F77M, &F77N, &alpha,
+      strsm_( fside,  fuplo,  ftran,  fdiag,  &F77M, &F77N, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
 #ifdef StringStructPtr
       fside.len = 1; fside.cp = &cside; fuplo.len = 1; fuplo.cp = &cuplo;
       ftran.len = 1; ftran.cp = &ctran; fdiag.len = 1; fdiag.cp = &cdiag;
-      F77dtrsm( &fside, &fuplo, &ftran, &fdiag, &F77M, &F77N, &alpha,
+      strsm_( &fside, &fuplo, &ftran, &fdiag, &F77M, &F77N, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
    }
@@ -946,25 +946,25 @@ void HPL_strsm
       cside = ( SIDE == HplRight ? 'L' : 'R' );
       cuplo = ( UPLO == HplLower ? 'U' : 'L' );
 #ifdef StringSunStyle
-      F77dtrsm( &cside, &cuplo, &ctran, &cdiag, &F77N, &F77M, &alpha,
+      strsm_( &cside, &cuplo, &ctran, &cdiag, &F77N, &F77M, &alpha,
                 A, &F77lda, B, &F77ldb, IONE, IONE, IONE, IONE );
 #endif
 #ifdef StringCrayStyle
       fside = HPL_C2F_CHAR( cside ); fuplo = HPL_C2F_CHAR( cuplo );
       ftran = HPL_C2F_CHAR( ctran ); fdiag = HPL_C2F_CHAR( cdiag );
-      F77dtrsm( fside,  fuplo,  ftran,  fdiag,  &F77N, &F77M, &alpha,
+      strsm_( fside,  fuplo,  ftran,  fdiag,  &F77N, &F77M, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
 #ifdef StringStructVal
       fside.len = 1; fside.cp = &cside; fuplo.len = 1; fuplo.cp = &cuplo;
       ftran.len = 1; ftran.cp = &ctran; fdiag.len = 1; fdiag.cp = &cdiag;
-      F77dtrsm( fside,  fuplo,  ftran,  fdiag,  &F77N, &F77M, &alpha,
+      strsm_( fside,  fuplo,  ftran,  fdiag,  &F77N, &F77M, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
 #ifdef StringStructPtr
       fside.len = 1; fside.cp = &cside; fuplo.len = 1; fuplo.cp = &cuplo;
       ftran.len = 1; ftran.cp = &ctran; fdiag.len = 1; fdiag.cp = &cdiag;
-      F77dtrsm( &fside, &fuplo, &ftran, &fdiag, &F77N, &F77M, &alpha,
+      strsm_( &fside, &fuplo, &ftran, &fdiag, &F77N, &F77M, &alpha,
                 A, &F77lda, B, &F77ldb );
 #endif
    }

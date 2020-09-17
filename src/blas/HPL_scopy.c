@@ -158,7 +158,7 @@ void HPL_scopy
 #define F77incx              INCX
 #define F77incy              INCY
 #endif
-   F77dcopy( &F77N, X, &F77incx, Y, &F77incy );
+   scopy_( &F77N, X, &F77incx, Y, &F77incy );
 #endif
 /*
  * End of HPL_scopy

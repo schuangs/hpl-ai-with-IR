@@ -98,7 +98,7 @@ void HPL_pdgesv
 
    A->info = 0;
 
-
+//    HPL_barrier(GRID->all_comm);
 //    if (GRID->myrow == 1 && GRID->mycol == 0)
 // {
 //    printf("\n======");
@@ -116,6 +116,14 @@ void HPL_pdgesv
 //    printf("\n------");
 // }
 
+   // HPL_barrier(GRID->all_comm);
+   // printf("\n[ ");
+   // for (int i = 0; i < A->nq-1; ++i){
+   //    printf("%f, ", *(A->X + i));
+   // }
+   // printf(" ]\n");
+   // HPL_barrier(GRID->all_comm);
+
    if( ( ALGO->depth == 0 ) || ( GRID->npcol == 1 ) )
    {
       HPL_pdgesv0(  GRID, ALGO, A );
@@ -127,22 +135,6 @@ void HPL_pdgesv
 /*
  * Solve upper triangular system
  */
-// if (GRID->myrow == 1 && GRID->mycol == 0)
-// {
-//    printf("\n======");
-//    for (int i = 0; i < A->mp; ++i)
-//    {
-//       printf("\n|");
-//       for(int j = 0; j < A->nq+1; ++j)
-//       {
-//          if (*Mptr(A->A, i, j, A->ld) >= 0)
-//             printf(" ");
-//          printf("%8f, ", *Mptr(A->A, i, j, A->ld));
-//       }
-//       printf("|");
-//    }
-//    printf("\n------");
-// }
 
    if( A->info == 0 ) HPL_pdtrsv( GRID, A);
 

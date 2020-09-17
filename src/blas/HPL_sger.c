@@ -183,9 +183,9 @@ void HPL_sger
 #endif
 
    if( ORDER == HplColumnMajor )
-   {  F77dger( &F77M, &F77N, &alpha, X, &F77incx, Y, &F77incy, A, &F77lda ); }
+   {  sger_( &F77M, &F77N, &alpha, X, &F77incx, Y, &F77incy, A, &F77lda ); }
    else
-   {  F77dger( &F77N, &F77M, &alpha, Y, &F77incy, X, &F77incx, A, &F77lda ); }
+   {  sger_( &F77N, &F77M, &alpha, Y, &F77incy, X, &F77incx, A, &F77lda ); }
 #endif
 /*
  * End of HPL_dger
