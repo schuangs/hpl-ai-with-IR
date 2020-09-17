@@ -31,7 +31,8 @@ STDC_ARGS( (
    HPL_T_grid *,
    HPL_T_palg *,
    HPL_T_pdmat *,
-   const double *
+   const double *,
+   double *
 ) );
 
 int                              drive_dgmres

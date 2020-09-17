@@ -15,7 +15,8 @@ void HPL_pgmres
    HPL_T_grid *                     GRID,
    HPL_T_palg *                     ALGO,
    HPL_T_pdmat *                    A,
-   const double *                   FACT
+   const double *                   FACT,
+   double *                         R
 )
 #else
 void HPL_pdgesv0
@@ -24,6 +25,7 @@ void HPL_pdgesv0
    HPL_T_palg *                     ALGO;
    HPL_T_pdmat *                    A;
    const double *                   FACT;
+   double *                         R;
 #endif
 {
 /* 
@@ -44,7 +46,7 @@ void HPL_pdgesv0
  *         On entry,  ALGO  points to  the data structure containing the
  *         algorithmic parameters to be used for this test.
  * 
- * A       (local input/output)          HPL_T_pdmat *
+ * A       (local input)                 HPL_T_pdmat *
  *         On entry, A points to the data structure containing the local
  *         array  information.  The  residual  vector is  stored  in the 
  *         column between [ A | b ] and X as input. The corection vector
@@ -53,6 +55,12 @@ void HPL_pdgesv0
  * FACT    (local input)                 const double *
  *         On entry, FA  points  to  the  data structure  containing the 
  *         L and U factors which are used as preconditioning matrices.
+ * 
+ * R       (local input/output)          double *
+ *         On  entry, R  points to  the data  structure  containing  the 
+ *         residual vector  which plays a role as the right-hand side of 
+ *         this  routine to obtain  correcting vector. Correcting vector 
+ *         will overwrite R as output.
  *
  * ---------------------------------------------------------------------
  */ 
@@ -77,9 +85,6 @@ void HPL_pdgesv0
    ione = 1; izero = 0;
    mp = A->mp; nq = A->nq-1; lda = A->ld;
 
-   /* residual vector pointer */
-   rptr = Mptr(A->A, 0, nloc, lda);
-
 /*
  * Set integer control pararmeters
  */
@@ -95,7 +100,7 @@ void HPL_pdgesv0
 /*
  * Set float control pararmeters
  */
-   cntl[0] = 1e-5;   /* convergence tolerance for backward error */
+   cntl[0] = 1e-16;  /* convergence tolerance for backward error */
    cntl[1] = 0;      /* normalizing factor ALPHA */
    cntl[2] = 0;      /* normalizing factor BETA */
    cntl[3] = 0;      /* normalizing factor ALPHAP */
@@ -118,7 +123,7 @@ void HPL_pdgesv0
  * allocate work space and load rhs into work space
  */
    work = (double *)malloc( lwork*sizeof(double) );
-   memcpy(work+nloc, rptr, nloc);
+   memcpy(work+nloc, R, nloc);
 /*
  * load initial guess of solution
  */
@@ -149,7 +154,7 @@ void HPL_pdgesv0
                                ((size_t)(ALGO->align) * sizeof(double) ) );
 
 /*
- * fill the space with unit matrix for calculating precondition matrix
+ * fill the space with unit matrix for calculating preconditioning matrix
  */
    memset(invptrL, 0, ( (size_t)(ALGO->align) + 
                            (size_t)(A->ld) * (size_t)(nq) ) *
@@ -221,9 +226,9 @@ void HPL_pdgesv0
    }
 
 /*
- * copy refined solution back to overwrite residual vector
+ * copy correcting vector back to overwrite residual vector
  */
-   memcpy(rptr, work, nloc);
+   memcpy(R, work, nloc);
 
    if (work) free(work);
    if (vL) free(vL);

@@ -63,7 +63,7 @@ void HPL_pir
  */
    int                i, j;
    int                mp, nq, n, nb, npcol, myrow, mycol, tarcol, info[3];
-   double           * Bptr, *Bptr1, *factors;
+   double           * Bptr, *factors, *res;
    void             * vF;
 
 /* ..
@@ -72,8 +72,7 @@ void HPL_pir
    mp = A->mp; nq = A->nq-1; n = A->n; nb = A->nb;
    npcol = GRID->npcol; mycol = GRID->mycol; myrow = GRID->myrow;
    
-   Bptr  = Mptr( A->A,  0, nq-1, A->ld );
-   Bptr1 = Mptr( A->A,  0, nq,   A->ld);
+   Bptr  = Mptr( A->A,  0, nq, A->ld );
 
 /*
  * allocate  space for factors, which  contains LU factors of  lower 
@@ -116,6 +115,11 @@ void HPL_pir
    }
 
 /*
+ * allocate space for residual vector
+ */
+   res = (double *)malloc( (size_t)mp * sizeof(double) );
+
+/*
  * tarcol is the process column containing b in [ A | b ]
  */
    tarcol = HPL_indxg2p( n, nb, nb, 0, npcol );
@@ -128,26 +132,26 @@ void HPL_pir
       /* Calculate residual in double precision */
       if( mycol ==  tarcol)
       {
-         memcpy(Bptr1,Bptr,A->mp*sizeof(double));
+         memcpy(res, Bptr, mp*sizeof(double));
          HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, -HPL_rone,
-                  A->A, A->ld, A->X, 1, HPL_rone, Bptr1, 1 );
+                  A->A, A->ld, A->X, 1, HPL_rone, res, 1 );
       }
       else if( nq > 0 )
       {
          HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, -HPL_rone,
-                  A->A, A->ld, A->X, 1, HPL_rzero, Bptr1, 1 );
+                  A->A, A->ld, A->X, 1, HPL_rzero, res, 1 );
       }
-      else { for( j = 0; j < mp; j++ ) Bptr1[j] = HPL_rzero; }
+      else { for( j = 0; j < mp; j++ ) res[j] = HPL_rzero; }
       
       if (mp > 0)
-         HPL_all_reduce( Bptr1, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
+         HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
 
       if (myrow == 0 && mycol == 0)
       {
          printf("\n");
          for (j = 0; j < mp; ++j)
          {
-            printf("%f, ", *(Bptr1 + j));
+            printf("%.16f, ", *(res + j));
          }
          printf("\n");
       }
@@ -157,15 +161,15 @@ void HPL_pir
     * precision.  And  the  correction vector d will overwrite the space 
     * pointed by Bptr1 .
     */
-   //    HPL_pgmres(GRID, ALGO, A, factors);
+      HPL_pgmres(GRID, ALGO, A, factors, res);
 
-   // /*
-   //  * update solution
-   //  */
-   //    for (j = 0; j < nq; ++j)
-   //    {
-   //       *(A->X + j) += *(Bptr1 + j);
-   //    }
+   /*
+    * update solution
+    */
+      for (j = 0; j < nq; ++j)
+      {
+         *(A->X + j) += *(res + j);
+      }
    }
 
    if (vF) free(vF);

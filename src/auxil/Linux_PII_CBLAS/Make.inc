@@ -1,1 +1,1 @@
-/home/schuang/Desktop/mix_precision/codes/HPL_FILE/hpl-2.3-s2/Make.Linux_PII_CBLAS
+/home/schuang/Desktop/mix_precision/codes/HPL_FILE/hpl-2.3-s1/Make.Linux_PII_CBLAS
