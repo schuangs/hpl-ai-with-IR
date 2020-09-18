@@ -146,15 +146,15 @@ void HPL_pir
       if (mp > 0)
          HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
 
-      if (myrow == 0 && mycol == 0)
-      {
-         printf("\n");
-         for (j = 0; j < mp; ++j)
-         {
-            printf("%.16f, ", *(res + j));
-         }
-         printf("\n");
-      }
+      // if (myrow == 0 && mycol == 0)
+      // {
+      //    printf("\n");
+      //    for (j = 0; j < mp; ++j)
+      //    {
+      //       printf("%.16f, ", *(res + j));
+      //    }
+      //    printf("\n");
+      // }
 
    /* 
     * Solve correction equation using preconditioned GMRES method in mix

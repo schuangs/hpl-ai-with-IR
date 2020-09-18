@@ -68,7 +68,8 @@ void HPL_pdgesv0
 /*
  * .. Local Variables ..
  */
-   int                i, n, nloc, m, lwork, irc[5], icntl[8], info[3], inv_info[3];
+   int                i,  n, nloc, m,  lwork, irc[5], icntl[8], info[3], 
+                      inv_info[3];
    int                mp, nq, lda;
    int                ione, izero;
    int                diagi, diagj, local_i, local_j;
@@ -80,10 +81,11 @@ void HPL_pdgesv0
 /* ..
  * .. Executable Statements ..
  */
-   n = A->n; nloc = A->nq-1; 
-   m = 5; one = 1.0; zero = 0.0;
+   n = A->n;  
+   m = 8; one = 1.0; zero = 0.0;
    ione = 1; izero = 0;
    mp = A->mp; nq = A->nq-1; lda = A->ld;
+   nloc = Mmax(mp, nq);
 
 /*
  * Set integer control pararmeters
@@ -94,13 +96,13 @@ void HPL_pdgesv0
    icntl[3] = 1;     /* left preconditioning */
    icntl[4] = 3;     /* orthogonalization scheme: ICGS */
    icntl[5] = 1;     /* initial guess of solution vector is zero */
-   icntl[6] = 2000;  /* maximum number of iterations */
+   icntl[6] = 200000;  /* maximum number of iterations */
    icntl[7] = 0;     /* strategy to compute residual at restart */
 
 /*
  * Set float control pararmeters
  */
-   cntl[0] = 1e-16;  /* convergence tolerance for backward error */
+   cntl[0] = 1e-14;  /* convergence tolerance for backward error */
    cntl[1] = 0;      /* normalizing factor ALPHA */
    cntl[2] = 0;      /* normalizing factor BETA */
    cntl[3] = 0;      /* normalizing factor ALPHAP */
@@ -117,17 +119,20 @@ void HPL_pdgesv0
    {
       lwork = m*m + m*(nloc+5) + 5*nloc + m + 1;
    }
-   if (icntl[7] != 1)   lwork += nloc;
+   if (icntl[7] != 1)
+   {
+      lwork += nloc;
+   }
 
 /*
  * allocate work space and load rhs into work space
  */
    work = (double *)malloc( lwork*sizeof(double) );
-   memcpy(work+nloc, R, nloc);
+   memcpy(work+nloc, R, mp);
 /*
  * load initial guess of solution
  */
-   memcpy(work, A->X, nloc);
+   memcpy(work, A->X, nq);
 
 /*
  * allocate space for precondition matrix
@@ -138,9 +143,12 @@ void HPL_pdgesv0
    vU = (void*)malloc( ( (size_t)(ALGO->align) + 
                            (size_t)(A->ld+1) * (size_t)(nq+1) ) *
                          sizeof(double) );
-   inv_info[0] = (invptrL == NULL || invptrU == NULL); inv_info[1] = GRID->myrow; inv_info[2] = GRID->mycol;
+   inv_info[0] = (vL == NULL || vU == NULL); 
+   inv_info[1] = GRID->myrow; 
+   inv_info[2] = GRID->mycol;
    (void) HPL_all_reduce( (void *)(inv_info), 3, HPL_INT, HPL_max,
                           GRID->all_comm );
+   
    if( inv_info[0] != 0 )
    {
       /* some processes might have succeeded with allocation */
@@ -148,6 +156,7 @@ void HPL_pdgesv0
       if (vU) free(vU);
       return;
    }
+
    invptrL = (double *)HPL_PTR( vL,
                                ((size_t)(ALGO->align) * sizeof(double) ) );
    invptrU = (double *)HPL_PTR( vU,
@@ -157,10 +166,10 @@ void HPL_pdgesv0
  * fill the space with unit matrix for calculating preconditioning matrix
  */
    memset(invptrL, 0, ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld) * (size_t)(nq) ) *
+                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
                          sizeof(double));
    memset(invptrU, 0, ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld) * (size_t)(nq) ) *
+                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
                          sizeof(double));                     
    for (i = 0; i < n; ++i)
    {
@@ -180,7 +189,7 @@ void HPL_pdgesv0
    HPL_dtrsm(HplColumnMajor, HplLeft, HplUpper, HplNoTrans, HplNonUnit, 
             n, n, 1.0, FACT, A->ld, invptrU, A->ld);
    HPL_dtrsm(HplColumnMajor, HplLeft, HplLower, HplNoTrans, HplUnit, 
-            n, n, 1.0,FACT, A->ld, invptrL, A->ld);
+            n, n, 1.0, FACT, A->ld, invptrL, A->ld);
 
 /*
  * drive GMRES with reverse communication
@@ -233,6 +242,9 @@ void HPL_pdgesv0
    if (work) free(work);
    if (vL) free(vL);
    if (vU) free(vU);
+
+
+   printf("INFO[0] = %d\n", info[0]);
 
 /*
  * End of HPL_pgmres
