@@ -96,13 +96,13 @@ void HPL_pdgesv0
    icntl[3] = 1;     /* left preconditioning */
    icntl[4] = 3;     /* orthogonalization scheme: ICGS */
    icntl[5] = 1;     /* initial guess of solution vector is zero */
-   icntl[6] = 200000;  /* maximum number of iterations */
+   icntl[6] = 2000;  /* maximum number of iterations */
    icntl[7] = 0;     /* strategy to compute residual at restart */
 
 /*
  * Set float control pararmeters
  */
-   cntl[0] = 1e-14;  /* convergence tolerance for backward error */
+   cntl[0] = 1e-10;  /* convergence tolerance for backward error */
    cntl[1] = 0;      /* normalizing factor ALPHA */
    cntl[2] = 0;      /* normalizing factor BETA */
    cntl[3] = 0;      /* normalizing factor ALPHAP */
@@ -123,7 +123,6 @@ void HPL_pdgesv0
    {
       lwork += nloc;
    }
-
 /*
  * allocate work space and load rhs into work space
  */
@@ -183,13 +182,30 @@ void HPL_pdgesv0
       }
    }
 
+   // if (GRID->myrow == 0 && GRID->mycol == 0)
+   // {
+   //    printf("\n======");
+   //    for (int i = 0; i < A->mp; ++i)
+   //    {
+   //       printf("\n|");
+   //       for(int j = 0; j < A->nq-1; ++j)
+   //       {
+   //          if (*Mptr(invptrL, i, j, A->ld) >= 0)
+   //             printf(" ");
+   //          printf("%f, ", *Mptr(invptrL, i, j, A->ld));
+   //       }
+   //       printf("|");
+   //    }
+   //    printf("\n------");
+   // }
+
 /*
  * calculate inverse of L and U, stored in invptrL and invptrU
  */
    HPL_dtrsm(HplColumnMajor, HplLeft, HplUpper, HplNoTrans, HplNonUnit, 
-            n, n, 1.0, FACT, A->ld, invptrU, A->ld);
+            mp, nq, 1.0, FACT, A->ld, invptrU, A->ld);
    HPL_dtrsm(HplColumnMajor, HplLeft, HplLower, HplNoTrans, HplUnit, 
-            n, n, 1.0, FACT, A->ld, invptrL, A->ld);
+            mp, nq, 1.0, FACT, A->ld, invptrL, A->ld);
 
 /*
  * drive GMRES with reverse communication
