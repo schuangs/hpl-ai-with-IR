@@ -10,7 +10,6 @@
    http://www.netlib.org/f2c/libf2c.zip
 */
 
-// #include "dpackfgmres.h"
 #include <stdio.h>
 #include <math.h>
 /* Table of constant values */
@@ -61,7 +60,7 @@ static double c_b305 = 0.;
 /* *  endeavours to notify the authors of the package of this publication. */
 /* * */
 /* *  [1] V. Frayss�, L. Giraud, S. Gratton, and J. Langou, A set of GMRES */
-/* *    routines for real and complex arithmetics on high performance */
+/* *    routines for double and complex arithmetics on high performance */
 /* *    computers, CERFACS Technical Report TR/PA/03/3, public domain software */
 /* *    available on www.cerfacs/algor/Softs, 2003 */
 /* * */
@@ -1243,6 +1242,8 @@ int PlaneRotation(int *n, double *dx, int *incx,
   --irc;
   --work;
 
+  // printf("index = %d, %.16f, ", irc[4], *(work+irc[4]+1));
+
   /* Function Body */
 
   /*       intrinsic ifix, float */
@@ -1965,7 +1966,7 @@ int PlaneRotation(int *n, double *dx, int *incx,
     printf(" %.3e \n",be);
     if (iwarn != 0) {
       printf(" WARNING GMRES : \n");
-      printf(" Intial residual is zero \n");
+      printf(" Initial residual is zero \n");
       printf(" initial guess is solution\n");
     }
     return 0;

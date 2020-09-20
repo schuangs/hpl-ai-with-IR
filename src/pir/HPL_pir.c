@@ -151,7 +151,7 @@ void HPL_pir
       //    printf("\n");
       //    for (j = 0; j < mp; ++j)
       //    {
-      //       printf("%.16f, ", *(res + j));
+      //       printf("%.16f, ", *(A->X + j));
       //    }
       //    printf("\n");
       // }
@@ -159,7 +159,7 @@ void HPL_pir
    /* 
     * Solve correction equation using preconditioned GMRES method in mix
     * precision.  And  the  correction vector d will overwrite the space 
-    * pointed by Bptr1 .
+    * pointed by res .
     */
       HPL_pgmres(GRID, ALGO, A, factors, res);
 

@@ -71,9 +71,9 @@ void HPL_pdgesv0
    int                i,  n, nloc, m,  lwork, irc[5], icntl[8], info[3], 
                       inv_info[3];
    int                mp, nq, lda;
-   int                ione, izero;
+   int                exit_flag;
    int                diagi, diagj, local_i, local_j;
-   double           * work, * rptr, cntl[5], rinfo[2], one, zero;
+   double           * work, * rptr, cntl[5], rinfo[2];
    double           * invptrL, * invptrU;
    void             * vL, * vU;
    char               ctran;
@@ -81,9 +81,9 @@ void HPL_pdgesv0
 /* ..
  * .. Executable Statements ..
  */
+
    n = A->n;  
-   m = 8; one = 1.0; zero = 0.0;
-   ione = 1; izero = 0;
+   m = 4;
    mp = A->mp; nq = A->nq-1; lda = A->ld;
    nloc = Mmax(mp, nq);
 
@@ -95,14 +95,14 @@ void HPL_pdgesv0
    icntl[2] = 0;     /* do not display convergence history */
    icntl[3] = 1;     /* left preconditioning */
    icntl[4] = 3;     /* orthogonalization scheme: ICGS */
-   icntl[5] = 1;     /* initial guess of solution vector is zero */
-   icntl[6] = 2000;  /* maximum number of iterations */
+   icntl[5] = 0;     /* initial guess of solution vector is zero */
+   icntl[6] = 1000;  /* maximum number of iterations */
    icntl[7] = 0;     /* strategy to compute residual at restart */
 
 /*
  * Set float control pararmeters
  */
-   cntl[0] = 1e-10;  /* convergence tolerance for backward error */
+   cntl[0] = 1e-14;  /* convergence tolerance for backward error */
    cntl[1] = 0;      /* normalizing factor ALPHA */
    cntl[2] = 0;      /* normalizing factor BETA */
    cntl[3] = 0;      /* normalizing factor ALPHAP */
@@ -127,11 +127,7 @@ void HPL_pdgesv0
  * allocate work space and load rhs into work space
  */
    work = (double *)malloc( lwork*sizeof(double) );
-   memcpy(work+nloc, R, mp);
-/*
- * load initial guess of solution
- */
-   memcpy(work, A->X, nq);
+   memcpy(work+nloc, R, nloc*sizeof(double));
 
 /*
  * allocate space for precondition matrix
@@ -164,12 +160,8 @@ void HPL_pdgesv0
 /*
  * fill the space with unit matrix for calculating preconditioning matrix
  */
-   memset(invptrL, 0, ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
-                         sizeof(double));
-   memset(invptrU, 0, ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld+1) * (size_t)(nq+1) ) *
-                         sizeof(double));                     
+   memset(invptrL, 0, ( (size_t)(A->ld) * (size_t)(nq) ) * sizeof(double));
+   memset(invptrU, 0, ( (size_t)(A->ld) * (size_t)(nq) ) * sizeof(double));                    
    for (i = 0; i < n; ++i)
    {
       HPL_indxg2lp(&local_i, &diagi, i, A->nb, A->nb, 0, GRID->nprow);
@@ -182,23 +174,6 @@ void HPL_pdgesv0
       }
    }
 
-   // if (GRID->myrow == 0 && GRID->mycol == 0)
-   // {
-   //    printf("\n======");
-   //    for (int i = 0; i < A->mp; ++i)
-   //    {
-   //       printf("\n|");
-   //       for(int j = 0; j < A->nq-1; ++j)
-   //       {
-   //          if (*Mptr(invptrL, i, j, A->ld) >= 0)
-   //             printf(" ");
-   //          printf("%f, ", *Mptr(invptrL, i, j, A->ld));
-   //       }
-   //       printf("|");
-   //    }
-   //    printf("\n------");
-   // }
-
 /*
  * calculate inverse of L and U, stored in invptrL and invptrU
  */
@@ -210,7 +185,8 @@ void HPL_pdgesv0
 /*
  * drive GMRES with reverse communication
  */
-   while (1)
+   exit_flag = 0;
+   while (!exit_flag)
    {
       drive_dgmres(&n, &nloc, &m, &lwork, work,
                    irc, icntl, cntl, info, rinfo);
@@ -220,30 +196,26 @@ void HPL_pdgesv0
       {
       case 0:
          /* normal exit */
+         exit_flag = 1;
          break;
       case 1:
          /* matrix-vector product */
-         ctran = 'N';
-         dgemv_(&ctran, &mp, &nq, &one, A->A, lda, work+irc[1],
-                &ione, &zero, work+irc[3], &ione, ione);
+         HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, A->A, lda, work+irc[1]-1,
+                1, 0, work+irc[3]-1, 1);
          break;
       case 2:
          /* first preconditioning */
-         ctran = 'N';
-         dgemv_(&ctran, &mp, &nq, &one, invptrL, lda, work+irc[1],
-                &ione, &zero, work+irc[3], &ione, ione);
+         HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, invptrL, lda, work+irc[1]-1,
+                1, 0, work+irc[3]-1, 1);
          break;
       case 3:
          /* second preconditioning */
-         ctran = 'N';
-         dgemv_(&ctran, &mp, &nq, &one, invptrU, lda, work+irc[1],
-                &ione, &zero, work+irc[3], &ione, ione);
+         HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, invptrU, lda, work+irc[1]-1,
+                1, 0, work+irc[3]-1, 1);
          break;
       case 4:
-         /* dot products or in fact another matrix-vector product */
-         ctran = 'Y';
-         dgemv_(&ctran, &nloc, irc[4], &one, work+irc[1], &nloc, 
-               work+irc[2], &ione, &zero, work+irc[3], &ione, ione);
+         HPL_dgemv(HplColumnMajor, HplTrans, nloc, irc[4], 1, work+irc[1]-1, nloc, 
+               work+irc[2]-1, 1, 0, work+irc[3]-1, 1);
          break;
       default:
          break;
@@ -253,14 +225,16 @@ void HPL_pdgesv0
 /*
  * copy correcting vector back to overwrite residual vector
  */
-   memcpy(R, work, nloc);
+   memcpy(R, work, nloc*sizeof(double));
 
    if (work) free(work);
    if (vL) free(vL);
    if (vU) free(vU);
 
-
-   printf("INFO[0] = %d\n", info[0]);
+   if (info[0] != 0)
+   {
+      printf("INFO[0] = %d\n", info[0]);
+   }
 
 /*
  * End of HPL_pgmres

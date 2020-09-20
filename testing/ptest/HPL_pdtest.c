@@ -519,7 +519,7 @@ void HPL_pdtest
 
       if( resid1 >= TEST->thrsh ) 
       {
-         HPL_fprintf( TEST->outfp, "%s%18.6f\n",
+         HPL_fprintf( TEST->outfp, "%s%18.16f\n",
          "||Ax-b||_oo  . . . . . . . . . . . . . . . . . = ", resid0 );
          HPL_fprintf( TEST->outfp, "%s%18.6f\n",
          "||A||_oo . . . . . . . . . . . . . . . . . . . = ", AnormI );
