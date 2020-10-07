@@ -32,21 +32,24 @@ STDC_ARGS( (
    HPL_T_palg *,
    HPL_T_pdmat *,
    const double *,
-   double *
+   double *,
+   double,
+   const int,
+   const int
 ) );
 
-int                              drive_dgmres
-(
-   int *n, 
-   int *nloc, 
-   int *m, 
-	int *lwork, 
-   double *work, 
-   int *irc, 
-   int *icntl, 
-	double *cntl, 
-   int *info, 
-   double *rinfo
-);
+// int                              drive_dgmres
+// (
+//    int *n, 
+//    int *nloc, 
+//    int *m, 
+// 	int *lwork, 
+//    double *work, 
+//    int *irc, 
+//    int *icntl, 
+// 	double *cntl, 
+//    int *info, 
+//    double *rinfo
+// );
 
 #endif

@@ -11,6 +11,10 @@
 
 #define IR 5
 
+#define TOL 1e-14       /* Tolerance for GMRES residual */
+#define MM 5            /* restart size for GMRES */
+#define MAXIT 500       /* maximum number of GMRES iteration */
+
 #ifdef STDC_HEADERS
 void HPL_pir
 (
@@ -63,7 +67,7 @@ void HPL_pir
  */
    int                i, j;
    int                mp, nq, n, nb, npcol, myrow, mycol, tarcol, info[3];
-   double           * Bptr, *factors, *res;
+   double           * Bptr, *factors, *res, *d, *t, *pA;
    void             * vF;
 
 /* ..
@@ -115,10 +119,11 @@ void HPL_pir
    }
 
 /*
- * allocate space for residual vector
+ * allocate space for residual vector, correction vector and preconditioned A
  */
-   res = (double *)malloc( (size_t)mp * sizeof(double) );
-
+   res = (double*)malloc((size_t)mp * sizeof(double));
+   d   = (double*)malloc((size_t)mp * sizeof(double));
+   t   = (double*)malloc((size_t)nq * sizeof(double));
 /*
  * tarcol is the process column containing b in [ A | b ]
  */
@@ -146,33 +151,26 @@ void HPL_pir
       if (mp > 0)
          HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
 
-      // if (myrow == 0 && mycol == 0)
-      // {
-      //    printf("\n");
-      //    for (j = 0; j < mp; ++j)
-      //    {
-      //       printf("%.16f, ", *(A->X + j));
-      //    }
-      //    printf("\n");
-      // }
-
    /* 
-    * Solve correction equation using preconditioned GMRES method in mix
-    * precision.  And  the  correction vector d will overwrite the space 
-    * pointed by res .
+    * Solve correction  equation using preconditioned  GMRES  method in mix
+    * precision.  But d is distributed just like res and replicated in each
+    * process of a process row.
     */
-      HPL_pgmres(GRID, ALGO, A, factors, res);
+      HPL_pgmres(GRID, ALGO, A, factors, res, d, TOL, MM, MAXIT);
 
    /*
-    * update solution
+    * update  solution,  first  need  to  transform d into the distributing 
+    * pattern of X
     */
       for (j = 0; j < nq; ++j)
       {
-         *(A->X + j) += *(res + j);
+         *(A->X + j) += *(d + j);
       }
    }
 
    if (vF) free(vF);
+   if (d)  free(d);
+   if (dx) free(dx);
 /*
  * End of HPL_pir
  */
