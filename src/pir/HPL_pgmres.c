@@ -68,7 +68,7 @@ void HPL_pdgesv0
 /*
  * .. Local Variables ..
  */
-   int                i,  n, nloc, m,  lwork, irc[5], icntl[8], info[3], 
+   int                i,  n, nloc, m,  lwork, irc[6], icntl[8], info[3], 
                       inv_info[3];
    int                mp, nq, lda;
    int                exit_flag;
@@ -214,8 +214,16 @@ void HPL_pdgesv0
                 1, 0, work+irc[3]-1, 1);
          break;
       case 4:
-         HPL_dgemv(HplColumnMajor, HplTrans, nloc, irc[4], 1, work+irc[1]-1, nloc, 
+         if (irc[5] == 0)
+         {
+            HPL_dgemv(HplColumnMajor, HplTrans, mp, irc[4], 1, work+irc[1]-1, nloc, 
                work+irc[2]-1, 1, 0, work+irc[3]-1, 1);
+         }
+         else if (irc[5] == 1)
+         {
+            HPL_dgemv(HplColumnMajor, HplTrans, nq, irc[4], 1, work+irc[1]-1, nloc, 
+               work+irc[2]-1, 1, 0, work+irc[3]-1, 1);
+         }
          break;
       default:
          break;

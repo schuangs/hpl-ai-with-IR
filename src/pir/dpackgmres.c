@@ -1831,6 +1831,7 @@ int PlaneRotation(int *n, double *dx, int *incx,
   irc[3] = bptr;
   irc[4] = dotptr;
   irc[5] = 1;
+  irc[6] = 0;
   retlbl = 5;
   return 0;
  L5:
@@ -1892,6 +1893,7 @@ int PlaneRotation(int *n, double *dx, int *incx,
       irc[3] = r0ptr;
       irc[4] = dotptr;
       irc[5] = 1;
+      irc[6] = 0;
       retlbl = 8;
       return 0;
     }
@@ -2333,6 +2335,7 @@ int PlaneRotation(int *n, double *dx, int *incx,
 	irc[3] = xptr;
 	irc[4] = dotptr;
 	irc[5] = 1;
+  irc[6] = 1;
 	retlbl = 51;
 	return 0;
       }
