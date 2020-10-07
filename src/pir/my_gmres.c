@@ -36,6 +36,7 @@ void givens_rotations
     const int                       k           /* offset */
 )
 {
+    /* local variables */
     int pi, pi1, ii, ii1;
     double tmp;
 
@@ -145,23 +146,28 @@ void givens_rotations
     }
 }
 
+/* generateHouseholder()
+ *
+ */
 void generateHouseholder
 (
     HPL_T_grid *                    GRID,
-    const double *                  x,          /* global target vector pointer */
-    double *                        u,          /* global result Householder Vector */
+    HPL_T_pdmat *                   A,          /* local A */
+    const double *                  x,          /* local target vector pointer */
+    double *                        u,          /* local result Householder Vector */
     const int                       k,          /* order of the Householder */
     double *                        alpha,      /* result variable */
-    const int                       li,         /* local start index of x */
-    const int                       ui,         /* local end index of x */
 )
 {
+    /* local variables */
     const int myrow = GRID->myrow;
+    int i, ig, mp = A->mp, pi;
     double segsum = 0;
 
-    for(int i = li; i < ui; i++)
+    for(i = 0; i < mp; i++)
     {
-        if(i >= k)
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+        if(ig >= k)
         {
             //transfer the input vector to the output
             u[i] = x[i];
@@ -170,25 +176,25 @@ void generateHouseholder
         }
     }
     double r=0;
+    HPL_indxg2lp(&i, &pi, k, A->nb, A->nb, 0, GRID->nprow);
     //Get the result on process row 0
-    HPL_reduce(&segsum, &r, 1, HPL_DOUBLE, HPL_sum, 0, GRID->col_comm);
+    HPL_reduce(&segsum, &r, 1, HPL_DOUBLE, HPL_sum, pi, GRID->col_comm);
     //do the final calculations
-    if(myrow == 0)
+    if(myrow == pi)
     {
         //Generate alpha and r
-        *alpha = -sign(x[k]) * sqrt(r);
-        r = sqrt( 0.5*((*alpha)*(*alpha)-x[k]*(*alpha)));
+        *alpha = -sign(x[i]) * sqrt(r);
+        r = sqrt( 0.5*((*alpha)*(*alpha)-x[i]*(*alpha)));
         //get the first value of the transformation vector
-        u[k]=x[k]-*alpha;
-    }else
-    {
-        *alpha=0;
+        u[i]=x[i]-*alpha;
     }
     //Send r to all process:
-    HPL_broadcast(&r, 1, HPL_DOUBLE, 0, GRID->col_comm);
+    HPL_broadcast(&r, 1, HPL_DOUBLE, pi, GRID->col_comm);
+    HPL_broadcast(alpha, 1, HPL_DOUBLE, pi, GRID->col_comm);
     //and apply 1/2r:
-    for(int i = li; i < ui; i++){
-        if(i >= k){
+    for(i = 0; i < mp; i++){
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+        if(ig >= k){
             u[i] *= (1./(2.*r));
         }
     }
@@ -197,18 +203,19 @@ void generateHouseholder
 void applyHouseholder
 (
     HPL_T_grid *                    GRID,
+    HPL_T_pdmat *                   A,          /* local A */
     const double *                  u,
     const double *                  x,
     double *                        y,
     const int                       k,
-    const int                       li,         /* local start index of x */
-    const int                       ui,         /* local end index of x */
 )
 {
     double segsum = 0;
-    for(int i = li; i < ui; i++)
+    int i, ig;
+    for(i = 0; i < mp; i++)
     {
-        if(i >= k)
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+        if(ig >= k)
         {
             segsum += u[i] * x[i];
         }
@@ -217,9 +224,10 @@ void applyHouseholder
     //Broadcast the sum
     HPL_all_reduce(&segsum, &tc, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
     //The changed part:
-    for(int i = li; i < x.ui; i++)
+    for(i = 0; i < mp; i++)
     {
-        if(i >= k)
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+        if(ig >= k)
         {
             y[i]=x[i]-2*tc*u[i];
         }
