@@ -2,10 +2,10 @@
  *  by Junkang Huang, Dec. 2020
  * 
  *  based on the implementation of parallel GMRES:
- *      PARALLELIZATION OF THE GMRES ---by Morgan Görtz, Lund University.
+ *      Parallelization Of The GMRES ---by Morgan Görtz, Lund University.
  *  
  *  and the pioneer work implementing Householder Transformation into GMRES:
- *      IMPLEMENTATION OF THE GMRES METHOD USING HOUSEHOLDER TRANSFORMATIONS METHOD
+ *      Implementation Of The GMRES Method Using Householder Transformations Method
  *      ---by Homer F. Walker, 1988
  */
 # include "hpl.h"
@@ -72,15 +72,15 @@ void givens_rotations
             if (GRID->myrow == pi)
             {
                 /* update v */
-                HPL_dsend(&v[ii], 1, pi1, 0, GRID->col_comm);
-                HPL_drecv(&tmp,   1, pi1, 0, GRID->col_comm);
+                HPL_send(&v[ii], 1, pi1, 0, GRID->col_comm);
+                HPL_recv(&tmp,   1, pi1, 0, GRID->col_comm);
                 v[ii] = cosus[i]*v[ii] - sinus[i]*tmp;
             }
             if (GRID->myrow == pi1)
             {   
                 /* update v */
-                HPL_dsend(&v[ii1], 1, pi, 0, GRID->col_comm);
-                HPL_drecv(&tmp,    1, pi, 0, GRID->col_comm);
+                HPL_send(&v[ii1], 1, pi, 0, GRID->col_comm);
+                HPL_recv(&tmp,    1, pi, 0, GRID->col_comm);
                 v[ii1] = sinus[i]*tmp + cosus[i]*v[ii1];
             }
         }
@@ -120,13 +120,13 @@ void givens_rotations
         /* calculate sin and cos for Jk */
         if (GRID->myrow == pi)
         {
-            HPL_drecv(&tmp,   1, pi1, 1, GRID->col_comm);
+            HPL_recv(&tmp,   1, pi1, 1, GRID->col_comm);
             cosus[k]  = v[ii] / sqrt(v[ii]*v[ii] + tmp*tmp);
             sinus[k]  = -tmp  / sqrt(v[ii]*v[ii] + tmp*tmp);
         }
         else if (GRID->myrow == pi1)
         {
-            HPL_dsend(&v[ii1], 1, pi, 1, GRID->col_comm);
+            HPL_send(&v[ii1], 1, pi, 1, GRID->col_comm);
         }
         /* broadcast sin and cos */
         HPL_broadcast(&cosus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
@@ -135,14 +135,14 @@ void givens_rotations
         /* update v */
         if (GRID->myrow == pi)
         {
-            HPL_dsend(&v[ii], 1, pi1, 2, GRID->col_comm);
-            HPL_drecv(&tmp,   1, pi1, 2, GRID->col_comm);
+            HPL_send(&v[ii], 1, pi1, 2, GRID->col_comm);
+            HPL_recv(&tmp,   1, pi1, 2, GRID->col_comm);
             v[ii] = cosus[k]*v[ii] - sinus[k]*tmp;
         }
         if (GRID->myrow == pi1)
         {   
-            HPL_dsend(&v[ii1], 1, pi, 2, GRID->col_comm);
-            HPL_drecv(&tmp,    1, pi, 2, GRID->col_comm);
+            HPL_send(&v[ii1], 1, pi, 2, GRID->col_comm);
+            HPL_recv(&tmp,    1, pi, 2, GRID->col_comm);
             v[ii1] = sinus[k]*tmp + cosus[k]*v[ii1];
         }
         /* update w */
@@ -168,12 +168,12 @@ void givens_rotations
             {   
                 /* send v[i] to process row 0, i+3 is just a tag 
                     in case of message mismatch */
-                HPL_dsend(&v[ii], 1, 0, i+3, GRID->col_comm);
+                HPL_send(&v[ii], 1, 0, i+3, GRID->col_comm);
             }
             else if (GRID->myrow == 0)
             {
                 /* process row 0 receive v[i], and update local R */
-                HPL_drecv(Mptr(R, i, k, MM), 1, pi, i+3, GRID->col_comm);
+                HPL_recv(Mptr(R, i, k, MM), 1, pi, i+3, GRID->col_comm);
             }
         }
     }

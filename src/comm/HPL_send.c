@@ -59,7 +59,7 @@
 #ifdef STDC_HEADERS
 int HPL_send
 (
-   float *                         SBUF,
+   float *                          SBUF,
    int                              SCOUNT,
    int                              DEST,
    int                              STAG,

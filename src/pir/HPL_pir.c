@@ -1,6 +1,10 @@
 /*
  * By Junkang Huang, August, 2020
  * 
+ * based on the paper:
+ *    A New  Analysis  Of Iterative Refinement And Its  Application To 
+ *    Accurate Solution Of Ill Conditioned Sparse Linear Systems
+ *    ---by Carson, Erin & Higham, Nicholas J., 2017
  */
 
 /*
@@ -67,8 +71,7 @@ void HPL_pir
  */
    int                i, j;
    int                mp, nq, n, nb, npcol, myrow, mycol, tarcol, info[3];
-   double           * Bptr, *factors, *res, *d, *t, *pA;
-   void             * vF;
+   double           * Bptr, *factors, *res, *d, *t, *pre;
 
 /* ..
  * .. Executable Statements ..
@@ -79,26 +82,14 @@ void HPL_pir
    Bptr  = Mptr( A->A,  0, nq, A->ld );
 
 /*
- * allocate  space for factors, which  contains LU factors of  lower 
- * precision and needed to be stored in double precision space.
+ * allocate  space  for  factors, which  contains LU factors of  lower
+ * precision and needed to be stored in double precision space. And pre
+ * which contains the preconditioning matrices U-1 and L-1. pre in fact
+ * contains the inverses of L and U that are stored in factors.
  */
-   vF = (void*)malloc( ( (size_t)(ALGO->align) + 
-                           (size_t)(A->ld + 1) * (size_t)(nq+1) ) *
-                         sizeof(double) );
-   info[0] = (vF == NULL); info[1] = myrow; info[2] = mycol;
-   (void) HPL_all_reduce( (void *)(info), 3, HPL_INT, HPL_max,
-                          GRID->all_comm );
-   if( info[0] != 0 )
-   {
-      /* some processes might have succeeded with allocation */
-      if (vF) free(vF);
-      return;
-   }
-/*
- * align pointer
- */
-   factors = (double *)HPL_PTR( vF,
-                               ((size_t)(ALGO->align) * sizeof(double) ) );
+   factors = (double*)malloc( mp * nq * sizeof(double) );
+   pre     = (double*)malloc( mp * nq * sizeof(double) );
+
 /*
  * Convert L and U into double precision for further operations
  */
@@ -119,16 +110,27 @@ void HPL_pir
    }
 
 /*
- * allocate space for residual vector, correction vector and preconditioned A
+ * allocate space for residual vector, correction vectors.
  */
    res = (double*)malloc((size_t)mp * sizeof(double));
    d   = (double*)malloc((size_t)mp * sizeof(double));
    t   = (double*)malloc((size_t)nq * sizeof(double));
+
+/*
+ * parallelly calculate preconditioning matrix: pre = U-1L-1
+ */
+
+/* 
+ * calculate U-1 by Gaussian Eliminations, that is to transform:
+ *    U-1[U, I] => [I, U-1], in parallel.
+ */
+   HPL_my_pdtrsm(GRID, factors, pre, mp, nq, n);
+
+
 /*
  * tarcol is the process column containing b in [ A | b ]
  */
    tarcol = HPL_indxg2p( n, nb, nb, 0, npcol );
-
 /*
  * Iterative Refinement
  */
@@ -156,21 +158,26 @@ void HPL_pir
     * precision.  But d is distributed just like res and replicated in each
     * process of a process row.
     */
-      HPL_pgmres(GRID, ALGO, A, factors, res, d, TOL, MM, MAXIT);
+      HPL_pgmres(GRID, ALGO, A, pre, res, t, TOL, MM, MAXIT);
 
    /*
-    * update  solution,  first  need  to  transform d into the distributing 
-    * pattern of X
+    * in  order  to update solution, first  need to  transform  t into  the 
+    * distributing pattern of X, which is stored in d.
     */
+
+
+   /* update X with d */
       for (j = 0; j < nq; ++j)
       {
          *(A->X + j) += *(d + j);
       }
    }
 
-   if (vF) free(vF);
-   if (d)  free(d);
-   if (dx) free(dx);
+   /* free dynamic memories */
+   if (vF)  free(vF);
+   if (d)   free(d);
+   if (t)   free(t);
+   if (pre) free(pre);
 /*
  * End of HPL_pir
  */
