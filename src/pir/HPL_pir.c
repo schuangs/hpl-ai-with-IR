@@ -69,15 +69,16 @@ void HPL_pir
 /*
  * .. Local Variables ..
  */
-   int                i, j;
-   int                mp, nq, n, nb, npcol, myrow, mycol, tarcol, info[3];
-   double           * Bptr, *factors, *res, *d, *t, *pre;
+   int                i, j, ig, il, ip;
+   int                mp, nq, n, nb, npcol, nprow, myrow, mycol, tarcol, info[3];
+   double           * Bptr, *factors, *res, *d, *preL, *preU;
 
 /* ..
  * .. Executable Statements ..
  */
    mp = A->mp; nq = A->nq-1; n = A->n; nb = A->nb;
-   npcol = GRID->npcol; mycol = GRID->mycol; myrow = GRID->myrow;
+   npcol = GRID->npcol; nprow = GRID->nprow;
+   mycol = GRID->mycol; myrow = GRID->myrow;
    
    Bptr  = Mptr( A->A,  0, nq, A->ld );
 
@@ -88,7 +89,8 @@ void HPL_pir
  * contains the inverses of L and U that are stored in factors.
  */
    factors = (double*)malloc( mp * nq * sizeof(double) );
-   pre     = (double*)malloc( mp * nq * sizeof(double) );
+   preL    = (double*)malloc( mp * nq * sizeof(double) );
+   preU    = (double*)malloc( mp * nq * sizeof(double) );
 
 /*
  * Convert L and U into double precision for further operations
@@ -114,7 +116,6 @@ void HPL_pir
  */
    res = (double*)malloc((size_t)mp * sizeof(double));
    d   = (double*)malloc((size_t)mp * sizeof(double));
-   t   = (double*)malloc((size_t)nq * sizeof(double));
 
 /*
  * parallelly calculate preconditioning matrix: pre = U-1L-1
@@ -124,8 +125,7 @@ void HPL_pir
  * calculate U-1 by Gaussian Eliminations, that is to transform:
  *    U-1[U, I] => [I, U-1], in parallel.
  */
-   HPL_my_pdtrsm(GRID, factors, pre, mp, nq, n);
-
+   HPL_my_pdtrsm(GRID, factors, preL, preU, mp, nq, n, nb);
 
 /*
  * tarcol is the process column containing b in [ A | b ]
@@ -155,29 +155,42 @@ void HPL_pir
 
    /* 
     * Solve correction  equation using preconditioned  GMRES  method in mix
-    * precision.  But d is distributed just like res and replicated in each
-    * process of a process row.
+    * precision.  
     */
-      HPL_pgmres(GRID, ALGO, A, pre, res, t, TOL, MM, MAXIT);
+      HPL_pgmres(GRID, ALGO, A, preL, preU, res, d, TOL, MM, MAXIT);
 
-   /*
-    * in  order  to update solution, first  need to  transform  t into  the 
-    * distributing pattern of X, which is stored in d.
+   /* update X with d
+
+    * But d is distributed just like res and replicated in each process of a
+    * process row and distributed along different rows.While X is replicated
+    * in  each process of a process column, and  distributed along different
+    * process columns.
     */
-
-
-   /* update X with d */
       for (j = 0; j < nq; ++j)
       {
-         *(A->X + j) += *(d + j);
+         /* global index of current element in X */
+         ig = HPL_indxl2g(j, nb, nb, mycol, 0, npcol);
+         /* calculate the local index of this  element and the row index of 
+            the process containing it */
+         HPL_indxg2lp(&il, &ip, ig, nb, nb, 0, nprow);
+         /* there is one and only one process which contains  both X[j] and
+             d[il], then update X[j] locally */
+         if (myrow == ip)
+         {
+            *(A->X + j) += d[il];
+         }
+         /* then this unique  process broadcasts updated X[j] to the  whole 
+            process column */
+         HPL_broadcast(A->X + j, 1, HPL_DOUBLE, ip, GRID->col_comm);
       }
    }
 
    /* free dynamic memories */
-   if (vF)  free(vF);
-   if (d)   free(d);
-   if (t)   free(t);
-   if (pre) free(pre);
+   if (d)         free(d);
+   if (preL)      free(preL);
+   if (preU)      free(preU);
+   if (factors)   free(factors);
+   if (res)       free(res);
 /*
  * End of HPL_pir
  */

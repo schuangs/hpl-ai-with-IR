@@ -4,7 +4,7 @@
  *  based on the implementation of parallel GMRES:
  *      Parallelization Of The GMRES ---by Morgan Görtz, Lund University.
  *  
- *  and the pioneer work implementing Householder Transformation into GMRES:
+ *  and the pioneer work implementing Householder Transformations into GMRES:
  *      Implementation Of The GMRES Method Using Householder Transformations Method
  *      ---by Homer F. Walker, 1988
  */
@@ -219,7 +219,6 @@ void generateHouseholder
             /* u[:k] should be 0 */
             u[i] = 0;
         }
-        
     }
     HPL_indxg2lp(&i, &pi, k, A->nb, A->nb, 0, GRID->nprow);
     /* Get the total segsum on process row which possess u[k] */
@@ -305,8 +304,9 @@ int pgmres
    HPL_T_grid *                     GRID,
    HPL_T_palg *                     ALGO,
    HPL_T_pdmat *                    A,          /* local A */
+   const double *                   preL,       /* preconditioning matrix L-1*/
+   const double *                   preU,       /* preconditioning matrix U-1*/
    const double *                   b,          /* local rhs */
-   const double *                   Pc,         /* preconditioning factors */
    double *                         x,          /* local solution vector */
    double                           TOL,        /* tolerance of residual */
    const int                        MM,         /* restart size */
@@ -320,18 +320,25 @@ int pgmres
 
 
     /* distributed storages: each process row stores a part of data */
-    double * v       = (double*)malloc(mp*sizeof(double));
-    double * u       = (double*)malloc(mp*sizeof(double));
-    double * H       = (double*)malloc(mp*MM*sizeof(double));
+    double * v   = (double*)malloc(mp*sizeof(double));
+    double * u   = (double*)malloc(mp*sizeof(double));
+    double * H   = (double*)malloc(mp*MM*sizeof(double));
+    double * rhs = (double*)malloc(mp*sizeof(double));
 
     /* replicated storage: all processes store the whole data */
     double * cosus = (double*)malloc((MM+1)*sizeof(double));
-    double * sinus   = (double*)malloc((MM+1)*sizeof(double));
-    double * w       = (double*)malloc((MM+1)*sizeof(double));
-    double * R       = (double*)malloc(MM*MM*sizeof(double));
+    double * sinus = (double*)malloc((MM+1)*sizeof(double));
+    double * w     = (double*)malloc((MM+1)*sizeof(double));
+    double * R     = (double*)malloc(MM*MM*sizeof(double));
+
+    /* precondition b into rhs, that is: rhs = U-1L-1b*/
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preL, mp, b, 1, 0, rhs, 1);
+    HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preU, mp, rhs, 1, 0, rhs, 1);
+    HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
     /* no initial guess so the first residual r0 is just b */
-    memcpy(v, b, mp*sizeof(double));
+    memcpy(v, rhs, mp*sizeof(double));
 
     norm = 0;
     /* calculate the norm of r0 */
@@ -370,10 +377,20 @@ int pgmres
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
                   A->A, A->ld, x, 1, 0, v, 1 );
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            /* v = b - v = b - Ax */
+
+            /* preconditioning A, using u as auxiliary storage */
+            HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+                  preL, mp, v, 1, 0, u, 1 );
+            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            memcpy(v, u, mp*sizeof(double));
+            HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+                  preU, mp, v, 1, 0, u, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            memcpy(v, u, mp*sizeof(double));
+            /* v = rhs - v = rhs - Ax */
             for (i = 0; i < mp; ++i)
             {
-                v[i] = b[i] - v[i];
+                v[i] = rhs[i] - v[i];
             }
             /* generate P0v = [alpha,0,..,0] */
             memset(w, 0, (MM+1)*sizeof(double));
@@ -406,6 +423,17 @@ int pgmres
                 A->A, A->ld, v, 1, 0, u, 1);
             HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
+
+            /* preconditioning A, using u as auxiliary storage */
+            HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+                  preL, mp, v, 1, 0, u, 1 );
+            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            memcpy(v, u, mp*sizeof(double));
+            HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+                  preU, mp, v, 1, 0, u, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            memcpy(v, u, mp*sizeof(double));
+
             /* apply last k + 1 Householder transformations: 
                 that is : v = PkPk-1...P0AP0P1...Pkek*/
             for(i = 0; i <= k; i++)
@@ -415,8 +443,7 @@ int pgmres
             /* generate and apply the last transformation */
             if(k < A->n - 1)
             {
-                memset(u, 0, mp*sizeof(double));
-                generateHouseholder(v, u, k+1, &tmp);
+                generateHouseholder(GRID, A, v, u, k+1, &tmp);
 
                 /* apply this transformation: v<-Pk+1v */
                 HPL_indxg2lp(&index, &pindex, k+1, A->nb, A->nb, 0, GRID->nprow);
@@ -434,7 +461,7 @@ int pgmres
                 }
             }
 
-            /* now v is the kth column of Hm. Apply Givens rotation on v */
+            /* now v is the kth column of Hm. Apply Givens rotations on v */
 
             tmp = 0;
             /* generate and apply Givens rotations on v and w */
@@ -498,6 +525,15 @@ int pgmres
     {
         start = MAXIT;
     }
+
+    if (v)      free(v);
+    if (u)      free(u);
+    if (H)      free(H);
+    if (rhs)    free(rhs);
+    if (cosus)  free(cosus);
+    if (sinus)  free(sinus);
+    if (w)      free(w);
+    if (R)      free(R);
 
     /* return total number of iterations performed */
     return (start * MM + k + 1);
