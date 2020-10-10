@@ -45,7 +45,6 @@
 # ######################################################################
 #  
 include Make.inc
-FF    =  gfortran
 #
 # ######################################################################
 #
@@ -58,7 +57,7 @@ INCdep           = \
 ## Object files ########################################################
 #
 HPL_pirobj       = \
-   HPL_pir.o      HPL_pgmres.o		dpackgmres.o
+   HPL_pir.o      HPL_pgmres.o		cal_pre.o
 #
 ## Targets #############################################################
 #
@@ -77,8 +76,8 @@ HPL_pir.o         : ../HPL_pir.c         $(INCdep)
 	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pir.c
 HPL_pgmres.o      : ../HPL_pgmres.c      $(INCdep)
 	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pgmres.c
-dpackgmres.o      : ../dpackgmres.c      $(INCdep)
-	$(CC) -o $@ -c $(CCFLAGS)  ../dpackgmres.c -lf2c -lm
+cal_pre.o         : ../cal_pre.c         $(INCdep)
+	$(CC) -o $@ -c $(CCFLAGS)  ../cal_pre.c
 #
 # ######################################################################
 #

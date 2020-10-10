@@ -15,9 +15,9 @@
 
 #define IR 5
 
-#define TOL 1e-14       /* Tolerance for GMRES residual */
+#define TOL 1e-16       /* Tolerance for GMRES residual */
 #define MM 5            /* restart size for GMRES */
-#define MAXIT 500       /* maximum number of GMRES iteration */
+#define MAXIT 100       /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
 void HPL_pir
@@ -71,6 +71,7 @@ void HPL_pir
  */
    int                i, j, ig, il, ip;
    int                mp, nq, n, nb, npcol, nprow, myrow, mycol, tarcol, info[3];
+   int                rmp, rnq;
    double           * Bptr, *factors, *res, *d, *preL, *preU;
 
 /* ..
@@ -83,14 +84,44 @@ void HPL_pir
    Bptr  = Mptr( A->A,  0, nq, A->ld );
 
 /*
- * allocate  space  for  factors, which  contains LU factors of  lower
- * precision and needed to be stored in double precision space. And pre
- * which contains the preconditioning matrices U-1 and L-1. pre in fact
- * contains the inverses of L and U that are stored in factors.
+ * allocate  space  for  factors, which  contains LU factors of  double
+ * precision, which is in fact of lower precision, just stored in double. 
+ * And preU and preL which contains the preconditioning matrices U-1 and L-1.
+ * preL adn preU in fact contains the inverses of L and U that are stored in factors.
  */
-   factors = (double*)malloc( mp * nq * sizeof(double) );
-   preL    = (double*)malloc( mp * nq * sizeof(double) );
-   preU    = (double*)malloc( mp * nq * sizeof(double) );
+
+   /* IMPORTANT!:: There may be some incomplete blocks at the rightest column and 
+    * bottom-est row. In order to treat them the same way as complete blocks, append
+    * some columns of 0s to the right and bottom. So local mp and nq of those 
+    * processes who contain incomplete blocks will be expanded into rmp and rnq.
+    * 
+    * First calculate rmp adn and rnq
+    */
+   rmp = mp; rnq = nq;
+   if (n % nb != 0)
+   {/* so there are some incomplete blocks */
+
+      /* determine which process column/row contains the incomplete blocks */
+      i = HPL_indxg2p((n/nb)*nb, nb, nb, 0, nprow);
+      j = HPL_indxg2p((n/nb)*nb, nb, nb, 0, npcol);
+      /* and expand mp and nq in these processes */
+      if (myrow == i)
+      {
+         rmp += nb - n % nb;
+      }
+      if (mycol == j)
+      {
+         rnq += nb - n % nb;
+      }
+   }
+
+   /* allocate spaces, and set 0s */
+   factors = (double*)malloc( rmp * rnq * sizeof(double) );
+   memset(factors, 0, rmp * rnq * sizeof(double));
+   preL    = (double*)malloc( rmp * rnq * sizeof(double) );
+   memset(preL,    0, rmp * rnq * sizeof(double));
+   preU    = (double*)malloc( rmp * rnq * sizeof(double) );
+   memset(preU,    0, rmp * rnq * sizeof(double));
 
 /*
  * Convert L and U into double precision for further operations
@@ -99,7 +130,7 @@ void HPL_pir
    {
       for (j = 0; j < nq; ++j)
       {
-         *Mptr(factors, i, j, A->ld) = (double)*Mptr(FA->A, i, j, FA->ld);
+         *Mptr(factors, i, j, mp) = (double)*Mptr(FA->A, i, j, FA->ld);
       }
    }
 /*
@@ -125,12 +156,11 @@ void HPL_pir
  * calculate U-1 by Gaussian Eliminations, that is to transform:
  *    U-1[U, I] => [I, U-1], in parallel.
  */
-   HPL_my_pdtrsm(GRID, factors, preL, preU, mp, nq, n, nb);
-
+   cal_pre(GRID, factors, preL, preU, mp, nq, rmp, n, nb);
 /*
  * tarcol is the process column containing b in [ A | b ]
  */
-   tarcol = HPL_indxg2p( n, nb, nb, 0, npcol );
+   tarcol = HPL_indxg2p( n, nb, nb, 0, npcol ); 
 /*
  * Iterative Refinement
  */
@@ -157,10 +187,9 @@ void HPL_pir
     * Solve correction  equation using preconditioned  GMRES  method in mix
     * precision.  
     */
-      HPL_pgmres(GRID, ALGO, A, preL, preU, res, d, TOL, MM, MAXIT);
-
+      HPL_pgmres(GRID, ALGO, A, preL, preU, rmp, res, d, TOL, MM, MAXIT);
    /* update X with d
-
+    *
     * But d is distributed just like res and replicated in each process of a
     * process row and distributed along different rows.While X is replicated
     * in  each process of a process column, and  distributed along different
@@ -191,6 +220,7 @@ void HPL_pir
    if (preU)      free(preU);
    if (factors)   free(factors);
    if (res)       free(res);
+
 /*
  * End of HPL_pir
  */

@@ -11,6 +11,8 @@
 # include "hpl.h"
 # include "mpi.h"
 
+# include <math.h>
+
 
 double sign(double x)
 {
@@ -72,15 +74,15 @@ void givens_rotations
             if (GRID->myrow == pi)
             {
                 /* update v */
-                HPL_send(&v[ii], 1, pi1, 0, GRID->col_comm);
-                HPL_recv(&tmp,   1, pi1, 0, GRID->col_comm);
+                HPL_dsend(&v[ii], 1, pi1, 0, GRID->col_comm);
+                HPL_drecv(&tmp,   1, pi1, 0, GRID->col_comm);
                 v[ii] = cosus[i]*v[ii] - sinus[i]*tmp;
             }
             if (GRID->myrow == pi1)
             {   
                 /* update v */
-                HPL_send(&v[ii1], 1, pi, 0, GRID->col_comm);
-                HPL_recv(&tmp,    1, pi, 0, GRID->col_comm);
+                HPL_dsend(&v[ii1], 1, pi, 0, GRID->col_comm);
+                HPL_drecv(&tmp,    1, pi, 0, GRID->col_comm);
                 v[ii1] = sinus[i]*tmp + cosus[i]*v[ii1];
             }
         }
@@ -120,13 +122,13 @@ void givens_rotations
         /* calculate sin and cos for Jk */
         if (GRID->myrow == pi)
         {
-            HPL_recv(&tmp,   1, pi1, 1, GRID->col_comm);
+            HPL_drecv(&tmp,   1, pi1, 1, GRID->col_comm);
             cosus[k]  = v[ii] / sqrt(v[ii]*v[ii] + tmp*tmp);
             sinus[k]  = -tmp  / sqrt(v[ii]*v[ii] + tmp*tmp);
         }
         else if (GRID->myrow == pi1)
         {
-            HPL_send(&v[ii1], 1, pi, 1, GRID->col_comm);
+            HPL_dsend(&v[ii1], 1, pi, 1, GRID->col_comm);
         }
         /* broadcast sin and cos */
         HPL_broadcast(&cosus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
@@ -135,14 +137,14 @@ void givens_rotations
         /* update v */
         if (GRID->myrow == pi)
         {
-            HPL_send(&v[ii], 1, pi1, 2, GRID->col_comm);
-            HPL_recv(&tmp,   1, pi1, 2, GRID->col_comm);
+            HPL_dsend(&v[ii], 1, pi1, 2, GRID->col_comm);
+            HPL_drecv(&tmp,   1, pi1, 2, GRID->col_comm);
             v[ii] = cosus[k]*v[ii] - sinus[k]*tmp;
         }
         if (GRID->myrow == pi1)
         {   
-            HPL_send(&v[ii1], 1, pi, 2, GRID->col_comm);
-            HPL_recv(&tmp,    1, pi, 2, GRID->col_comm);
+            HPL_dsend(&v[ii1], 1, pi, 2, GRID->col_comm);
+            HPL_drecv(&tmp,    1, pi, 2, GRID->col_comm);
             v[ii1] = sinus[k]*tmp + cosus[k]*v[ii1];
         }
         /* update w */
@@ -168,12 +170,12 @@ void givens_rotations
             {   
                 /* send v[i] to process row 0, i+3 is just a tag 
                     in case of message mismatch */
-                HPL_send(&v[ii], 1, 0, i+3, GRID->col_comm);
+                HPL_dsend(&v[ii], 1, 0, i+3, GRID->col_comm);
             }
             else if (GRID->myrow == 0)
             {
                 /* process row 0 receive v[i], and update local R */
-                HPL_recv(Mptr(R, i, k, MM), 1, pi, i+3, GRID->col_comm);
+                HPL_drecv(Mptr(R, i, k, MM), 1, pi, i+3, GRID->col_comm);
             }
         }
     }
@@ -202,7 +204,7 @@ void generateHouseholder
     /* local variables */
     const int myrow = GRID->myrow;
     int i, ig, mp = A->mp, pi;
-    double segsum = 0, r;
+    double r = 0;
 
     for(i = 0; i < mp; i++)
     {
@@ -212,7 +214,7 @@ void generateHouseholder
             /* load u[k:] with x[k:] for further operation */
             u[i] = x[i];
             /* calculate (xk*xk) + (xk+1*xk+1) + ...*/
-            segsum += x[i]*x[i];
+            r += x[i]*x[i];
         }
         else
         {
@@ -221,8 +223,8 @@ void generateHouseholder
         }
     }
     HPL_indxg2lp(&i, &pi, k, A->nb, A->nb, 0, GRID->nprow);
-    /* Get the total segsum on process row which possess u[k] */
-    HPL_reduce(&segsum, &r, 1, HPL_DOUBLE, HPL_sum, pi, GRID->col_comm);
+    /* Get the total r on process row which possess u[k] */
+    HPL_reduce(&r, 1, HPL_DOUBLE, HPL_sum, pi, GRID->col_comm);
 
     if(myrow == pi)
     {/* perform computation on process pi */
@@ -259,12 +261,12 @@ void applyHouseholder
     const double *                  x,          /* local object vector pointer */
     double *                        u,          /* local result Householder Vector */
     const int                       k,          /* order of the Householder */
-    double *                        y,          /* target vector */
+    double *                        y          /* target vector */
 )
 {
     /* local variables */
     double segsum = 0;
-    int i, ig, tc;
+    int i, ig;
 
     /* calculate (x, u) */
     for(i = 0; i < A->mp; i++)
@@ -275,8 +277,8 @@ void applyHouseholder
             segsum += u[i] * x[i];
         }
     }
-    /* store (x, u) in tc*/
-    HPL_all_reduce(&segsum, &tc, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
+    /* sum (x, u) */
+    HPL_all_reduce(&segsum, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
     
     /* calculate y = x - 2u(x, u) */
     for(i = 0; i < A->mp; i++)
@@ -284,7 +286,7 @@ void applyHouseholder
         ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
         if(ig >= k)
         {
-            y[i] = x[i] - 2 * tc * u[i];
+            y[i] = x[i] - 2 * segsum * u[i];
         }
         else
         {
@@ -296,16 +298,17 @@ void applyHouseholder
 }
 
 /*
- *  pgmres():
+ *  HPL_pgmres():
  * 
  */
-int pgmres
+int HPL_pgmres
 (
    HPL_T_grid *                     GRID,
    HPL_T_palg *                     ALGO,
    HPL_T_pdmat *                    A,          /* local A */
    const double *                   preL,       /* preconditioning matrix L-1*/
    const double *                   preU,       /* preconditioning matrix U-1*/
+   const int                        rmp,        /* local lda of preU and preL */
    const double *                   b,          /* local rhs */
    double *                         x,          /* local solution vector */
    double                           TOL,        /* tolerance of residual */
@@ -332,13 +335,13 @@ int pgmres
     double * R     = (double*)malloc(MM*MM*sizeof(double));
 
     /* precondition b into rhs, that is: rhs = U-1L-1b*/
-    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preL, mp, b, 1, 0, rhs, 1);
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preL, rmp, b, 1, 0, rhs, 1);
     HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preU, mp, rhs, 1, 0, rhs, 1);
-    HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preU, rmp, rhs, 1, 0, v, 1);
+    HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
     /* no initial guess so the first residual r0 is just b */
-    memcpy(v, rhs, mp*sizeof(double));
+    memcpy(rhs, v, mp*sizeof(double));
 
     norm = 0;
     /* calculate the norm of r0 */
@@ -364,6 +367,7 @@ int pgmres
         ready = 1;
         memset(x, 0, mp*sizeof(double));
     }
+
     /* ------------------------------------------------- */
     /*  Restart Iterations                               */
     /* ------------------------------------------------- */
@@ -380,11 +384,11 @@ int pgmres
 
             /* preconditioning A, using u as auxiliary storage */
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preL, mp, v, 1, 0, u, 1 );
+                  preL, rmp, v, 1, 0, u, 1 );
             HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preU, mp, v, 1, 0, u, 1 );
+                  preU, rmp, v, 1, 0, u, 1 );
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
             /* v = rhs - v = rhs - Ax */
@@ -426,11 +430,11 @@ int pgmres
 
             /* preconditioning A, using u as auxiliary storage */
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preL, mp, v, 1, 0, u, 1 );
+                  preL, rmp, v, 1, 0, u, 1 );
             HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preU, mp, v, 1, 0, u, 1 );
+                  preU, rmp, v, 1, 0, u, 1 );
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
 
@@ -466,11 +470,12 @@ int pgmres
             tmp = 0;
             /* generate and apply Givens rotations on v and w */
             /* sinus and cosus store the previous rotation parameters */
-            givens_rotations(GRID, A, v, w, R, sinus, cosus, k);
+            givens_rotations(GRID, A, v, w, R, sinus, cosus, k, MM);
             /* tmp stored the last element of w, which is the current residual */
             tmp = w[k+1];
             /* store the current error */
             currenterror = fabs(tmp);
+            // printf("Err: %.10f\n", currenterror);
             /* check if the solution is good enough */
             if(fabs(tmp) < TOL)
             {
@@ -485,12 +490,10 @@ int pgmres
         {
             k--;
         }
-        //Solve the triangular system and transfer it to u
-        if(id == 0)
-        {
-            /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
-            HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, MM, R, MM, w, 1);
-        }
+
+        /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
+        HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, MM, R, MM, w, 1);
+
         /* calculate the new solution */
         for(i = 0; i <= k; i++)
         {
@@ -513,6 +516,7 @@ int pgmres
                 x[j] += v[j]*w[i];
             }
         }
+
         /* if the error is small enough, stop. 
             otherwise another iteration will be initiated. */
         if(currenterror < TOL)

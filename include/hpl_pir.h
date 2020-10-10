@@ -26,11 +26,14 @@ STDC_ARGS( (
    HPL_T_pmat *
 ) );
 
-void                             HPL_pgmres
+int                              HPL_pgmres
 STDC_ARGS( (
    HPL_T_grid *,
    HPL_T_palg *,
    HPL_T_pdmat *,
+   const double *,
+   const double *,
+   const int,
    const double *,
    double *,
    double,
@@ -38,18 +41,17 @@ STDC_ARGS( (
    const int
 ) );
 
-// int                              drive_dgmres
-// (
-//    int *n, 
-//    int *nloc, 
-//    int *m, 
-// 	int *lwork, 
-//    double *work, 
-//    int *irc, 
-//    int *icntl, 
-// 	double *cntl, 
-//    int *info, 
-//    double *rinfo
-// );
+void                             cal_pre
+STDC_ARGS( (
+   HPL_T_grid *,  
+   const double *,
+   double *,      
+   double *,      
+   const int,     
+   const int,
+   const int,    
+   const int,     
+   const int     
+) );
 
 #endif
