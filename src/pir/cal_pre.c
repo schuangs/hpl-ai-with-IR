@@ -105,7 +105,7 @@ void cal_pre
                     HPL_dsend(buffer, nb*nb, ipc, 0, GRID->row_comm);
                 }
             }
-            else if (myrow == ipr && mycol == ipc)
+            if (myrow == ipr && mycol == ipc)
             {
                 if (ipc != jpc)
                 {
@@ -173,13 +173,13 @@ void cal_pre
                 {/* send factors[k,j] to the process containing preL[k,i] through rank */
                     HPL_dsend(buffer, nb*nb, irank, 1, GRID->all_comm);
                 }
-                else if (GRID->iam == krank)
+                if (GRID->iam == krank)
                 {/* send preL[j,i] to the process containing preL[k,i] through rank */
                     packblock(buffer, Mptr(preL, klr, klc, rmp), rmp, nb, nb);
                     if (GRID->iam != irank)
                         HPL_dsend(buffer, nb*nb, irank, 2, GRID->all_comm);
                 }
-                else if (GRID->iam == irank)
+                if (GRID->iam == irank)
                 {
                     /* collect factors[k,j] and preL[j,i] */
                     if (irank != jrank)
@@ -234,7 +234,7 @@ void cal_pre
                     HPL_dsend(buffer, nb*nb, ipr, 0, GRID->col_comm);
                 }
             }
-            else if (myrow == ipr && mycol == ipc)
+            if (myrow == ipr && mycol == ipc)
             {
                 if (jpr != ipr)
                 {
@@ -302,13 +302,15 @@ void cal_pre
                 {/* send factors[j,k] to the process containing preU[i,k] through rank */
                     HPL_dsend(buffer, nb*nb, irank, 1, GRID->all_comm);
                 }
-                else if (GRID->iam == krank)
+
+                if (GRID->iam == krank)
                 {/* send preU[i,j] to the process containing preU[i,k] through rank */
                     packblock(buffer, Mptr(preU, klr, klc, rmp), rmp, nb, nb);
                     if (GRID->iam != irank)
                         HPL_dsend(buffer, nb*nb, irank, 2, GRID->all_comm);
                 }
-                else if (GRID->iam == irank)
+
+                if (GRID->iam == irank)
                 {
                     /* collect factors[j,k] and preU[i,j] */
                     if (irank != jrank)

@@ -152,6 +152,7 @@ void givens_rotations
         w[k+1] = sinus[k]*w[k] + cosus[k]*w[k+1];
         w[k]   = tmp;
     }
+    
     /* update R */
     for (i = 0; i < MM; ++i)
     {
@@ -269,7 +270,7 @@ void applyHouseholder
     int i, ig;
 
     /* calculate (x, u) */
-    for(i = 0; i < A->mp; i++)
+    for(i = 0; i < A->mp; ++i)
     {
         ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
         if(ig >= k)
@@ -281,7 +282,7 @@ void applyHouseholder
     HPL_all_reduce(&segsum, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
     
     /* calculate y = x - 2u(x, u) */
-    for(i = 0; i < A->mp; i++)
+    for(i = 0; i < A->mp; ++i)
     {
         ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
         if(ig >= k)
@@ -371,7 +372,7 @@ int HPL_pgmres
     /* ------------------------------------------------- */
     /*  Restart Iterations                               */
     /* ------------------------------------------------- */
-    for(start = 0; start <= MAXIT && !ready; start++)
+    for(start = 0; start <= MAXIT && !ready; ++start)
     {
         /* do the same as above to start the method */
         if(start)
@@ -386,10 +387,10 @@ int HPL_pgmres
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
                   preL, rmp, v, 1, 0, u, 1 );
             HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double));
+            memcpy(v, u, mp*sizeof(double)); 
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
                   preU, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
             /* v = rhs - v = rhs - Ax */
             for (i = 0; i < mp; ++i)
@@ -403,9 +404,9 @@ int HPL_pgmres
         /* ------------------------------------------------ */
         /* Householder transformations and Givens rotations */
         /* ------------------------------------------------ */
-        for(k = 0; k < MM; k++)
+        for(k = 0; k < MM; ++k)
         {
-            /* store the current trasformation in H */
+            /* store the current trasformation vector u in H */
             memcpy(Mptr(H, 0, k, mp), u, mp*sizeof(double));
 
             /* load ek into v */
@@ -417,7 +418,7 @@ int HPL_pgmres
             }
             /* apply the last k + 1 Householder transformations in reverse order:
                 that is : v = P0P1..Pkv */
-            for(i = k; i >= 0; i--)
+            for(i = k; i >= 0; --i)
             {
                 applyHouseholder(GRID, A, v, Mptr(H, 0, i, mp), i, v);
             }
@@ -435,7 +436,7 @@ int HPL_pgmres
             memcpy(v, u, mp*sizeof(double));
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
                   preU, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
             memcpy(v, u, mp*sizeof(double));
 
             /* apply last k + 1 Householder transformations: 
@@ -475,7 +476,10 @@ int HPL_pgmres
             tmp = w[k+1];
             /* store the current error */
             currenterror = fabs(tmp);
-            // printf("Err: %.10f\n", currenterror);
+            // HPL_barrier(GRID->all_comm);
+            // if (GRID->iam == 1)
+            // printf("Err: %.16f, Proc %d\n", currenterror, GRID->iam);fflush(stdout);
+            // HPL_barrier(GRID->all_comm);
             /* check if the solution is good enough */
             if(fabs(tmp) < TOL)
             {
@@ -488,16 +492,16 @@ int HPL_pgmres
         /* ------------------------------------ */
         if(k == MM)
         {
-            k--;
+            --k;
         }
 
         /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
-        HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, MM, R, MM, w, 1);
+        HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k, R, MM, w, 1);
 
         /* calculate the new solution */
-        for(i = 0; i <= k; i++)
+        for(i = 0; i <= k; ++i)
         {
-            /* set v into a unit vector, with v[i] = 1 */
+            /* load v with unit vector, with v[i] = 1 */
             memset(v, 0, mp*sizeof(double));
             HPL_indxg2lp(&index, &pindex, i, A->nb, A->nb, 0, GRID->nprow);
             if (GRID->myrow == pindex)
@@ -505,7 +509,7 @@ int HPL_pgmres
                 v[index] = 1;
             }
             /* apply last i + 1 householder transformations in reverse order */
-            for(j = i; j >= 0; j--)
+            for(j = i; j >= 0; --j)
             {
                 applyHouseholder(GRID, A, v, Mptr(H, 0, j, mp), j, v);
             }

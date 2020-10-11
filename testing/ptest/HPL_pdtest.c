@@ -239,28 +239,8 @@ void HPL_pdtest
     */
    HPL_pdgesv( GRID, ALGO, &matt );
 
-   /*
-    * Iterative refinement in higher precision, and the solution is 
-    * stored in highed precision mat->X
-    */
    HPL_pir( GRID, ALGO, &mat, &matt );
 
-   // if (GRID->myrow == 1 && GRID->mycol == 0)
-   // {
-   //    printf("\n======");
-   //    for (int i = 0; i < matt.mp; ++i)
-   //    {
-   //       printf("\n|");
-   //       for(int j = 0; j < matt.nq+1; ++j)
-   //       {
-   //          if (*Mptr(matt.A, i, j, matt.ld) >= 0)
-   //             printf(" ");
-   //          printf("%8f, ", *Mptr(matt.A, i, j, matt.ld));
-   //       }
-   //       printf("|");
-   //    }
-   //    printf("\n------");
-   // }
    if(dev) printf("PDGESV Finished, MATT.INFO = %d\n",matt.info);
    HPL_ptimer( 0 );
    time( &current_time_end );

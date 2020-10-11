@@ -12,11 +12,13 @@
  */ 
 #include "hpl.h"
 
+# include <math.h>
 
-#define IR 5
 
-#define TOL 1e-16       /* Tolerance for GMRES residual */
-#define MM 5            /* restart size for GMRES */
+#define IR 10
+
+#define TOL 1e-14       /* Tolerance for GMRES residual */
+#define MM 50            /* restart size for GMRES */
 #define MAXIT 100       /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
@@ -73,6 +75,7 @@ void HPL_pir
    int                mp, nq, n, nb, npcol, nprow, myrow, mycol, tarcol, info[3];
    int                rmp, rnq;
    double           * Bptr, *factors, *res, *d, *preL, *preU;
+   double             norm;
 
 /* ..
  * .. Executable Statements ..
@@ -120,15 +123,15 @@ void HPL_pir
    memset(factors, 0, rmp * rnq * sizeof(double));
    preL    = (double*)malloc( rmp * rnq * sizeof(double) );
    memset(preL,    0, rmp * rnq * sizeof(double));
-   preU    = (double*)malloc( rmp * rnq * sizeof(double) );
+   preU    = (double*)malloc( rmp * (rnq+1) * sizeof(double) );
    memset(preU,    0, rmp * rnq * sizeof(double));
 
 /*
  * Convert L and U into double precision for further operations
  */
-   for (i = 0; i < mp; ++i)
+   for (j = 0; j < nq; ++j)
    {
-      for (j = 0; j < nq; ++j)
+      for (i = 0; i < mp; ++i)
       {
          *Mptr(factors, i, j, mp) = (double)*Mptr(FA->A, i, j, FA->ld);
       }
@@ -157,6 +160,20 @@ void HPL_pir
  *    U-1[U, I] => [I, U-1], in parallel.
  */
    cal_pre(GRID, factors, preL, preU, mp, nq, rmp, n, nb);
+   // if (GRID->iam == 0)
+   // {
+   //    printf("----------------------------------------------------------------\n");
+   //    for (i = 0; i < mp; ++i)
+   //    {
+   //       for (j = 0; j < nq; ++j)
+   //       {
+   //          printf("%8f, ", *Mptr(preU, i, j, rmp));
+   //       }
+   //       printf("\n");
+   //    }
+   //    printf("================================================================\n");
+   //    fflush(stdout);
+   // }
 /*
  * tarcol is the process column containing b in [ A | b ]
  */
@@ -182,12 +199,21 @@ void HPL_pir
       
       if (mp > 0)
          HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
+      
+      for (j = 0; j < nq; ++j)
+      {
+         norm += res[j]*res[j];
+      }
+      HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
+      if (GRID->iam == 0)
+         printf("%.16f\n", norm);
 
    /* 
     * Solve correction  equation using preconditioned  GMRES  method in mix
     * precision.  
     */
       HPL_pgmres(GRID, ALGO, A, preL, preU, rmp, res, d, TOL, MM, MAXIT);
+
    /* update X with d
     *
     * But d is distributed just like res and replicated in each process of a
@@ -212,6 +238,14 @@ void HPL_pir
             process column */
          HPL_broadcast(A->X + j, 1, HPL_DOUBLE, ip, GRID->col_comm);
       }
+      // if (GRID->iam == 0)
+      // {
+      //    for (int k = 0; k < mp; ++k)
+      //    {
+      //       printf("%.16f, ", (A->X)[k]);
+      //    }
+      //    printf("\n");
+      // }
    }
 
    /* free dynamic memories */
