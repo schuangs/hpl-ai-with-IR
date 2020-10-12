@@ -81,8 +81,8 @@ void givens_rotations
             if (GRID->myrow == pi1)
             {   
                 /* update v */
-                HPL_dsend(&v[ii1], 1, pi, 0, GRID->col_comm);
                 HPL_drecv(&tmp,    1, pi, 0, GRID->col_comm);
+                HPL_dsend(&v[ii1], 1, pi, 0, GRID->col_comm);
                 v[ii1] = sinus[i]*tmp + cosus[i]*v[ii1];
             }
         }
@@ -143,8 +143,9 @@ void givens_rotations
         }
         if (GRID->myrow == pi1)
         {   
-            HPL_dsend(&v[ii1], 1, pi, 2, GRID->col_comm);
+            
             HPL_drecv(&tmp,    1, pi, 2, GRID->col_comm);
+            HPL_dsend(&v[ii1], 1, pi, 2, GRID->col_comm);
             v[ii1] = sinus[k]*tmp + cosus[k]*v[ii1];
         }
         /* update w */
@@ -154,7 +155,7 @@ void givens_rotations
     }
     
     /* update R */
-    for (i = 0; i < MM; ++i)
+    for (i = 0; i < k+1; ++i)
     {
         HPL_indxg2lp(&ii, &pi, i, A->nb, A->nb, 0, GRID->nprow);
         if (pi == 0)
@@ -181,7 +182,7 @@ void givens_rotations
         }
     }
     /* broadcast R in process row 0 to all */
-    HPL_broadcast(Mptr(R, 0, k, MM), MM, HPL_DOUBLE, 0, GRID->col_comm);
+    HPL_broadcast(Mptr(R, 0, k, MM), k+1, HPL_DOUBLE, 0, GRID->col_comm);
 
     /* end of givens_rotations() */
 }
@@ -234,16 +235,13 @@ void generateHouseholder
         r = sqrt( 0.5*((*alpha)*(*alpha)-x[i]*(*alpha)));
         /* compute the first nonzero value of the transformation vector u */
         u[i]=x[i]-*alpha;
-    }
+    }   
     /* send r and alpha to all process */
     HPL_broadcast(&r, 1, HPL_DOUBLE, pi, GRID->col_comm);
     HPL_broadcast(alpha, 1, HPL_DOUBLE, pi, GRID->col_comm);
     /* apply 1/2r on u for all processes */
-    for(i = 0; i < mp; i++){
-        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
-        if(ig >= k){
-            u[i] *= (1./(2.*r));
-        }
+    for(i = 0; i < mp; ++i){
+        u[i] /= 2.*r;
     }
 
     /* end of generateHouseholder() */
@@ -299,22 +297,58 @@ void applyHouseholder
 }
 
 /*
+ * redistribute()
+ * 
+ * when performing A*v, if v is distributed with the pattern of rhs, some redistributions
+ * needed to perform to change v into the distribution pattern of x.
+ * 
+ */
+void redistribute
+(
+    HPL_T_grid *                     GRID,
+    HPL_T_pdmat *                    A,          /* local A */
+    const double *                   v,          /* the vector to be redistributed, size: mp */
+    double *                         vc         /* the target space, size: nq */
+)
+{
+    int ig, i, j, jp;
+    for (i = 0; i < A->nq; ++i)
+    {
+        /* find the global index of local vc[i] */
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->mycol, 0, GRID->npcol);
+
+        /* find the process row and local index of the element vc[i] stored in v */
+        HPL_indxg2lp(&j, &jp, ig, A->nb, A->nb, 0, GRID->nprow);
+        
+        /* there is one and only one process who contains both vc[i] and v[j] in 
+            this process column */
+        if (GRID->myrow == jp)
+        {
+            /* perform local replication */
+            vc[i] = v[j];
+        }
+        /* broadcast the correct vc to other processes in the column */
+        HPL_broadcast(&vc[i], 1, HPL_DOUBLE, jp, GRID->col_comm);
+    }
+}
+
+
+/*
  *  HPL_pgmres():
  * 
  */
 int HPL_pgmres
 (
-   HPL_T_grid *                     GRID,
-   HPL_T_palg *                     ALGO,
-   HPL_T_pdmat *                    A,          /* local A */
-   const double *                   preL,       /* preconditioning matrix L-1*/
-   const double *                   preU,       /* preconditioning matrix U-1*/
-   const int                        rmp,        /* local lda of preU and preL */
-   const double *                   b,          /* local rhs */
-   double *                         x,          /* local solution vector */
-   double                           TOL,        /* tolerance of residual */
-   const int                        MM,         /* restart size */
-   const int                        MAXIT       /* maximum # of total iteration */
+    HPL_T_grid *                     GRID,
+    HPL_T_pdmat *                    A,          /* local A */
+    const double *                   preL,       /* preconditioning matrix L-1*/
+    const double *                   preU,       /* preconditioning matrix U-1*/
+    const int                        rmp,        /* local lda of preU and preL */
+    const double *                   b,          /* local rhs */
+    double *                         x,          /* local solution vector */
+    double                           TOL,        /* tolerance of residual */
+    const int                        MM,         /* restart size */
+    const int                        MAXIT       /* maximum # of total iteration */
 )
 {
     /* local variables */
@@ -322,27 +356,31 @@ int HPL_pgmres
     double norm, currenterror, tmp;
     int mp = A->mp, nq = A->nq-1;
 
-
     /* distributed storages: each process row stores a part of data */
     double * v   = (double*)malloc(mp*sizeof(double));
     double * u   = (double*)malloc(mp*sizeof(double));
-    double * H   = (double*)malloc(mp*MM*sizeof(double));
+    double * xt  = (double*)malloc(nq*sizeof(double));
+    double * H   = (double*)malloc(mp*(MM+1)*sizeof(double));
     double * rhs = (double*)malloc(mp*sizeof(double));
 
     /* replicated storage: all processes store the whole data */
     double * cosus = (double*)malloc((MM+1)*sizeof(double));
     double * sinus = (double*)malloc((MM+1)*sizeof(double));
     double * w     = (double*)malloc((MM+1)*sizeof(double));
-    double * R     = (double*)malloc(MM*MM*sizeof(double));
+    double * R     = (double*)malloc(MM*(MM+1)*sizeof(double));
 
-    /* precondition b into rhs, that is: rhs = U-1L-1b*/
-    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preL, rmp, b, 1, 0, rhs, 1);
+    /* precondition b into rhs, that is: rhs = U-1L-1b, first should redistribute 
+        b into x pattern, see redistribute() function */
+    redistribute(GRID, A, b, xt);
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preL, rmp, xt, 1, 0, rhs, 1);
     HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preU, rmp, rhs, 1, 0, v, 1);
-    HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+
+    redistribute(GRID, A, rhs, xt);
+    HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, 1, preU, rmp, xt, 1, 0, rhs, 1);
+    HPL_all_reduce(rhs, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
     /* no initial guess so the first residual r0 is just b */
-    memcpy(rhs, v, mp*sizeof(double));
+    memcpy(v, rhs, mp*sizeof(double));
 
     norm = 0;
     /* calculate the norm of r0 */
@@ -366,7 +404,7 @@ int HPL_pgmres
     if(currenterror < TOL)
     {
         ready = 1;
-        memset(x, 0, mp*sizeof(double));
+        memset(x, 0, nq*sizeof(double));
     }
 
     /* ------------------------------------------------- */
@@ -383,15 +421,17 @@ int HPL_pgmres
                   A->A, A->ld, x, 1, 0, v, 1 );
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
-            /* preconditioning A, using u as auxiliary storage */
+            /* preconditioning A */
+            redistribute(GRID, A, v, xt);
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preL, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double)); 
+                  preL, rmp, xt, 1, 0, v, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+
+            redistribute(GRID, A, v, xt);
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preU, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double));
+                  preU, rmp, xt, 1, 0, v, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+
             /* v = rhs - v = rhs - Ax */
             for (i = 0; i < mp; ++i)
             {
@@ -423,21 +463,22 @@ int HPL_pgmres
                 applyHouseholder(GRID, A, v, Mptr(H, 0, i, mp), i, v);
             }
 
-            /* calculate u = AP0P1..Pkv */
+            /* calculate v = AP0P1..Pkv */
+            redistribute(GRID, A, v, xt);
             HPL_dgemv(HplColumnMajor, HplNoTrans, mp, nq, HPL_rone, 
-                A->A, A->ld, v, 1, 0, u, 1);
-            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double));
+                A->A, A->ld, xt, 1, 0, v, 1);
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
-            /* preconditioning A, using u as auxiliary storage */
+            /* preconditioning A */
+            redistribute(GRID, A, v, xt);
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preL, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double));
+                  preL, rmp, xt, 1, 0, v, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+
+            redistribute(GRID, A, v, xt);
             HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                  preU, rmp, v, 1, 0, u, 1 );
-            HPL_all_reduce(u, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-            memcpy(v, u, mp*sizeof(double));
+                  preU, rmp, xt, 1, 0, v, 1 );
+            HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
             /* apply last k + 1 Householder transformations: 
                 that is : v = PkPk-1...P0AP0P1...Pkek*/
@@ -456,7 +497,7 @@ int HPL_pgmres
                 {
                     v[index] = tmp;
                 }
-                for(int i = k+2; i < A->n; i++)
+                for(int i = k+2; i < A->n; ++i)
                 {
                     HPL_indxg2lp(&index, &pindex, i, A->nb, A->nb, 0, GRID->nprow);
                     if (GRID->myrow == pindex)
@@ -496,7 +537,7 @@ int HPL_pgmres
         }
 
         /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
-        HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k, R, MM, w, 1);
+        HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k+1, R, MM, w, 1);
 
         /* calculate the new solution */
         for(i = 0; i <= k; ++i)

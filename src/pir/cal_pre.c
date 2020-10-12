@@ -64,7 +64,7 @@ void cal_pre
     buffer2 = (double *)malloc(nb*nb*sizeof(double));
 
     /* number of blocks (including incomplete blocks) along row or column */
-    q = n / nb + 1;
+    q = (n % nb) ? n / nb + 1 : n / nb;
 
 /* calculate L-1 */
 
@@ -80,7 +80,7 @@ void cal_pre
     }
     for (j = 0; j < q; ++j) 
     {
-        /* calculate the local index and process index of global block index [j,j] */
+        /* calculate the local index and process index of global diagonal block index [j,j] */
         HPL_indxg2lp(&jlr, &jpr, j*nb, nb, nb, 0, nprow);
         HPL_indxg2lp(&jlc, &jpc, j*nb, nb, nb, 0, npcol);
 
@@ -175,9 +175,9 @@ void cal_pre
                 }
                 if (GRID->iam == krank)
                 {/* send preL[j,i] to the process containing preL[k,i] through rank */
-                    packblock(buffer, Mptr(preL, klr, klc, rmp), rmp, nb, nb);
+                    packblock(buffer2, Mptr(preL, klr, klc, rmp), rmp, nb, nb);
                     if (GRID->iam != irank)
-                        HPL_dsend(buffer, nb*nb, irank, 2, GRID->all_comm);
+                        HPL_dsend(buffer2, nb*nb, irank, 2, GRID->all_comm);
                 }
                 if (GRID->iam == irank)
                 {
@@ -263,7 +263,6 @@ void cal_pre
                 jrank = jpc * nprow + jpr;
             } 
 
-
             /* pack block data into buffer */
             if (GRID->iam == jrank)
             {
@@ -305,9 +304,9 @@ void cal_pre
 
                 if (GRID->iam == krank)
                 {/* send preU[i,j] to the process containing preU[i,k] through rank */
-                    packblock(buffer, Mptr(preU, klr, klc, rmp), rmp, nb, nb);
+                    packblock(buffer2, Mptr(preU, klr, klc, rmp), rmp, nb, nb);
                     if (GRID->iam != irank)
-                        HPL_dsend(buffer, nb*nb, irank, 2, GRID->all_comm);
+                        HPL_dsend(buffer2, nb*nb, irank, 2, GRID->all_comm);
                 }
 
                 if (GRID->iam == irank)

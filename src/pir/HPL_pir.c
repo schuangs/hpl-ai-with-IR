@@ -71,7 +71,7 @@ void HPL_pir
 /*
  * .. Local Variables ..
  */
-   int                i, j, ig, il, ip;
+   int                i, j;
    int                mp, nq, n, nb, npcol, nprow, myrow, mycol, tarcol, info[3];
    int                rmp, rnq;
    double           * Bptr, *factors, *res, *d, *preL, *preU;
@@ -123,7 +123,7 @@ void HPL_pir
    memset(factors, 0, rmp * rnq * sizeof(double));
    preL    = (double*)malloc( rmp * rnq * sizeof(double) );
    memset(preL,    0, rmp * rnq * sizeof(double));
-   preU    = (double*)malloc( rmp * (rnq+1) * sizeof(double) );
+   preU    = (double*)malloc( rmp * rnq * sizeof(double) );
    memset(preU,    0, rmp * rnq * sizeof(double));
 
 /*
@@ -133,7 +133,7 @@ void HPL_pir
    {
       for (i = 0; i < mp; ++i)
       {
-         *Mptr(factors, i, j, mp) = (double)*Mptr(FA->A, i, j, FA->ld);
+         *Mptr(factors, i, j, rmp) = (double)*Mptr(FA->A, i, j, FA->ld);
       }
    }
 /*
@@ -149,7 +149,7 @@ void HPL_pir
  * allocate space for residual vector, correction vectors.
  */
    res = (double*)malloc((size_t)mp * sizeof(double));
-   d   = (double*)malloc((size_t)mp * sizeof(double));
+   d   = (double*)malloc((size_t)nq * sizeof(double));
 
 /*
  * parallelly calculate preconditioning matrix: pre = U-1L-1
@@ -175,7 +175,7 @@ void HPL_pir
    //    fflush(stdout);
    // }
 /*
- * tarcol is the process column containing b in [ A | b ]
+ * tarcol is the process column containing b
  */
    tarcol = HPL_indxg2p( n, nb, nb, 0, npcol ); 
 /*
@@ -200,6 +200,7 @@ void HPL_pir
       if (mp > 0)
          HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
       
+      norm = 0;
       for (j = 0; j < nq; ++j)
       {
          norm += res[j]*res[j];
@@ -212,31 +213,14 @@ void HPL_pir
     * Solve correction  equation using preconditioned  GMRES  method in mix
     * precision.  
     */
-      HPL_pgmres(GRID, ALGO, A, preL, preU, rmp, res, d, TOL, MM, MAXIT);
+      HPL_pgmres(GRID, A, preL, preU, rmp, res, d, TOL, MM, MAXIT);
 
-   /* update X with d
-    *
-    * But d is distributed just like res and replicated in each process of a
-    * process row and distributed along different rows.While X is replicated
-    * in  each process of a process column, and  distributed along different
-    * process columns.
+   /* 
+    * update X with d
     */
       for (j = 0; j < nq; ++j)
       {
-         /* global index of current element in X */
-         ig = HPL_indxl2g(j, nb, nb, mycol, 0, npcol);
-         /* calculate the local index of this  element and the row index of 
-            the process containing it */
-         HPL_indxg2lp(&il, &ip, ig, nb, nb, 0, nprow);
-         /* there is one and only one process which contains  both X[j] and
-             d[il], then update X[j] locally */
-         if (myrow == ip)
-         {
-            *(A->X + j) += d[il];
-         }
-         /* then this unique  process broadcasts updated X[j] to the  whole 
-            process column */
-         HPL_broadcast(A->X + j, 1, HPL_DOUBLE, ip, GRID->col_comm);
+         *(A->X + j) += d[j];
       }
       // if (GRID->iam == 0)
       // {
