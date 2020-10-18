@@ -30,9 +30,7 @@ int                              HPL_pgmres
 STDC_ARGS( (
    HPL_T_grid *,
    HPL_T_pdmat *,
-   const double *,
-   const double *,
-   const int,
+   HPL_T_pdmat *,
    const double *,
    double *,
    double,

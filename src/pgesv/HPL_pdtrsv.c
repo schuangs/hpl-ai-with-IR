@@ -53,7 +53,7 @@
 void HPL_pdtrsv
 (
    HPL_T_grid *                     GRID,
-   HPL_T_pmat *                     AMAT
+   HPL_T_pdmat *                    AMAT
 )
 #else
 void HPL_pdtrsv
@@ -107,7 +107,7 @@ void HPL_pdtrsv
  * .. Local Variables ..
  */
    MPI_Comm                   Ccomm, Rcomm;
-   float                      * A=NULL, * Aprev=NULL, * Aptr, * XC=NULL,
+   double                      * A=NULL, * Aprev=NULL, * Aptr, * XC=NULL,
                               * XR=NULL, * Xd=NULL, * Xdprev=NULL,
                               * W=NULL;
    int                        Alcol, Alrow, Anpprev, Anp, Anq, Bcol,
@@ -139,15 +139,15 @@ void HPL_pdtrsv
    Alcol = tmp1 - ( tmp1 / npcol ) * npcol;
    kb    = n    - tmp1 * nb;
 
-   Aptr = (float *)(A); XC = Mptr( Aptr, 0, Anq, lda );
+   Aptr = (double *)(A); XC = Mptr( Aptr, 0, Anq, lda );
    Mindxg2p( n, nb, nb, Bcol, 0, npcol );
 
    if( ( Anp > 0 ) && ( Alcol != Bcol ) )
    {
       if( mycol == Bcol  )
-      { (void) HPL_send( XC, Anp, Alcol, Rmsgid, Rcomm ); }
+      { (void) HPL_dsend( XC, Anp, Alcol, Rmsgid, Rcomm ); }
       else if( mycol == Alcol )
-      { (void) HPL_recv( XC, Anp, Bcol,  Rmsgid, Rcomm ); }
+      { (void) HPL_drecv( XC, Anp, Bcol,  Rmsgid, Rcomm ); }
    }
    Rmsgid = ( Rmsgid + 2 >
               MSGID_END_PTRSV ? MSGID_BEGIN_PTRSV : Rmsgid + 2 );
@@ -159,7 +159,7 @@ void HPL_pdtrsv
    n1 = ( npcol - 1 ) * nb; n1 = Mmax( n1, nb );
    if( Anp > 0 )
    {
-      W = (float*)malloc( (size_t)(Mmin( n1, Anp )) * sizeof( float ) );
+      W = (double*)malloc( (size_t)(Mmin( n1, Anp )) * sizeof( double ) );
       if( W == NULL )
       { HPL_pabort( __LINE__, "HPL_pdtrsv", "Memory allocation failed" ); }
       Wfr = 1;
@@ -175,9 +175,9 @@ void HPL_pdtrsv
       Aprev = ( Aptr -= lda * kb ); Anq -= kb; Xdprev = ( Xd = XR + Anq );
       if( myrow == Alrow )
       {
-         HPL_strsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
+         HPL_dtrsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
                     kb, Aptr+Anp, lda, XC+Anp, 1 );
-         HPL_scopy( kb, XC+Anp, 1, Xd, 1 );
+         HPL_dcopy( kb, XC+Anp, 1, Xd, 1 );
       }
    }
 
@@ -206,12 +206,12 @@ void HPL_pdtrsv
          if( myrow == rowprev )
          {
             if( GridIsNot1xQ )
-               (void) HPL_send( Xdprev, kbprev, MModSub1( myrow, nprow ),
+               (void) HPL_dsend( Xdprev, kbprev, MModSub1( myrow, nprow ),
                                 Cmsgid, Ccomm );
          }
          else
          {
-            (void) HPL_recv( Xdprev, kbprev, MModAdd1( myrow, nprow ),
+            (void) HPL_drecv( Xdprev, kbprev, MModAdd1( myrow, nprow ),
                              Cmsgid, Ccomm );
          } 
 /*
@@ -221,11 +221,11 @@ void HPL_pdtrsv
          if( n1pprev > 0 )
          {
             tmp1 = Anpprev - n1pprev;
-            HPL_sgemv( HplColumnMajor, HplNoTrans, n1pprev, kbprev,
+            HPL_dgemv( HplColumnMajor, HplNoTrans, n1pprev, kbprev,
                        -HPL_rone, Aprev+tmp1, lda, Xdprev, 1, HPL_rone,
                        XC+tmp1, 1 );
             if( GridIsNotPx1 )
-               (void) HPL_send( XC+tmp1, n1pprev, Alcol, Rmsgid, Rcomm );
+               (void) HPL_dsend( XC+tmp1, n1pprev, Alcol, Rmsgid, Rcomm );
          }
 /*
  * Finish  the (decreasing-ring) broadcast of the solution block in pre-
@@ -233,7 +233,7 @@ void HPL_pdtrsv
  */
          if( ( myrow != rowprev ) &&
              ( myrow != MModAdd1( rowprev, nprow ) ) )
-            (void) HPL_send( Xdprev, kbprev, MModSub1( myrow, nprow ),
+            (void) HPL_dsend( Xdprev, kbprev, MModSub1( myrow, nprow ),
                              Cmsgid, Ccomm );
       }
       else if( mycol == Alcol )
@@ -244,8 +244,8 @@ void HPL_pdtrsv
  */
          if( n1pprev > 0 )
          {
-            (void) HPL_recv( W, n1pprev, colprev, Rmsgid, Rcomm );
-            HPL_saxpy( n1pprev, HPL_rone, W, 1, XC+Anpprev-n1pprev, 1 );
+            (void) HPL_drecv( W, n1pprev, colprev, Rmsgid, Rcomm );
+            HPL_daxpy( n1pprev, HPL_rone, W, 1, XC+Anpprev-n1pprev, 1 );
          }
       }
 /*
@@ -253,15 +253,15 @@ void HPL_pdtrsv
  */
       if( ( mycol == Alcol ) && ( myrow == Alrow ) )
       {
-         HPL_strsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
+         HPL_dtrsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
                     kb, Aptr+Anp, lda, XC+Anp, 1 );
-         HPL_scopy( kb, XC+Anp, 1, XR+Anq, 1 );
+         HPL_dcopy( kb, XC+Anp, 1, XR+Anq, 1 );
       }
 /*
 *  Finish previous update
 */
       if( ( mycol == colprev ) && ( ( tmp1 = Anpprev - n1pprev ) > 0 ) )
-         HPL_sgemv( HplColumnMajor, HplNoTrans, tmp1, kbprev, -HPL_rone,
+         HPL_dgemv( HplColumnMajor, HplNoTrans, tmp1, kbprev, -HPL_rone,
                     Aprev, lda, Xdprev, 1, HPL_rone, XC, 1 );
 /*
 *  Save info of current step and update info for the next step
@@ -283,7 +283,7 @@ void HPL_pdtrsv
  * Replicate last solution block
  */
    if( mycol == colprev )
-      (void) HPL_broadcast( (void *)(XR), kbprev, HPL_FLOAT, rowprev,
+      (void) HPL_broadcast( (void *)(XR), kbprev, HPL_DOUBLE, rowprev,
                             Ccomm );
 
    if( Wfr  ) free( W  );

@@ -40,4 +40,5 @@ pgesv/HPL_pdgesv0.c pgesv/HPL_pdgesv.c pgesv/HPL_pdgesvK1.c pgesv/HPL_pdgesvK2.c
 pgesv/HPL_pdlaswp00N.c pgesv/HPL_pdlaswp00T.c pgesv/HPL_pdlaswp01N.c pgesv/HPL_pdlaswp01T.c \
 pgesv/HPL_pdtrsv.c pgesv/HPL_pdupdateNN.c pgesv/HPL_pdupdateNT.c pgesv/HPL_pdupdateTN.c \
 pgesv/HPL_pdupdateTT.c pgesv/HPL_logsort.c pgesv/HPL_perm.c \
+pgesv/HPL_pstrsv.c pgesv/HPL_pLdtrsv.c \
 pir/HPL_pir.c pir/HPL_pgmres.c pir/cal_pre.c

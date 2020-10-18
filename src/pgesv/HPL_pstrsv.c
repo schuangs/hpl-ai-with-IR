@@ -50,13 +50,13 @@
 #include "hpl.h"
 
 #ifdef STDC_HEADERS
-void HPL_pLstrsv
+void HPL_pstrsv
 (
    HPL_T_grid *                     GRID,
    HPL_T_pmat *                     AMAT
 )
 #else
-void HPL_pLstrsv
+void HPL_pstrsv
 ( GRID, AMAT )
    HPL_T_grid *                     GRID;
    HPL_T_pmat *                     AMAT;
@@ -66,7 +66,7 @@ void HPL_pLstrsv
  * Purpose
  * =======
  *
- * HPL_pLstrsv solves an upper triangular system of linear equations.
+ * HPL_pstrsv solves an upper triangular system of linear equations.
  *  
  * The rhs is the last column of the N by N+1 matrix A. The solve starts
  * in the process  column owning the  Nth  column of A, so the rhs b may
@@ -135,8 +135,8 @@ void HPL_pLstrsv
    Mnumroc( Anq, n, nb, nb, mycol, 0, npcol );
 
    tmp1  = ( n - 1 ) / nb;
-   Alrow = ( tmp1 / nprow ) * nprow;
-   Alcol = ( tmp1 / npcol ) * npcol;
+   Alrow = tmp1 - ( tmp1 / nprow ) * nprow;
+   Alcol = tmp1 - ( tmp1 / npcol ) * npcol;
    kb    = n    - tmp1 * nb;
 
    Aptr = (float *)(A); XC = Mptr( Aptr, 0, Anq, lda );
@@ -161,7 +161,7 @@ void HPL_pLstrsv
    {
       W = (float*)malloc( (size_t)(Mmin( n1, Anp )) * sizeof( float ) );
       if( W == NULL )
-      { HPL_pabort( __LINE__, "HPL_pLstrv", "Memory allocation failed" ); }
+      { HPL_pabort( __LINE__, "HPL_pstrsv", "Memory allocation failed" ); }
       Wfr = 1;
    }
 
@@ -175,7 +175,7 @@ void HPL_pLstrsv
       Aprev = ( Aptr -= lda * kb ); Anq -= kb; Xdprev = ( Xd = XR + Anq );
       if( myrow == Alrow )
       {
-         HPL_strsv( HplColumnMajor, HplLower, HplNoTrans, HplNonUnit,
+         HPL_strsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
                     kb, Aptr+Anp, lda, XC+Anp, 1 );
          HPL_scopy( kb, XC+Anp, 1, Xd, 1 );
       }
@@ -253,7 +253,7 @@ void HPL_pLstrsv
  */
       if( ( mycol == Alcol ) && ( myrow == Alrow ) )
       {
-         HPL_strsv( HplColumnMajor, HplLower, HplNoTrans, HplNonUnit,
+         HPL_strsv( HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit,
                     kb, Aptr+Anp, lda, XC+Anp, 1 );
          HPL_scopy( kb, XC+Anp, 1, XR+Anq, 1 );
       }
@@ -291,6 +291,6 @@ void HPL_pLstrsv
    HPL_ptimer( HPL_TIMING_PTRSV );
 #endif
 /*
- * End of HPL_pLstrsv
+ * End of HPL_pstrsv
  */
 }

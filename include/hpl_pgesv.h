@@ -352,13 +352,19 @@ STDC_ARGS( (
 void                             HPL_pdtrsv
 STDC_ARGS( (
    HPL_T_grid *,
-   HPL_T_pmat *
+   HPL_T_pdmat *
 ) );
 
-void                             HPL_pLstrsv
+void                             HPL_pstrsv
 STDC_ARGS( (
    HPL_T_grid *,
    HPL_T_pmat *
+) );
+
+void                             HPL_pLdtrsv
+STDC_ARGS( (
+   HPL_T_grid *,
+   HPL_T_pdmat *
 ) );
 
 #endif

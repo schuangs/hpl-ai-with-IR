@@ -14,7 +14,6 @@
 
 # include <math.h>
 
-
 #define IR 10
 
 #define TOL 1e-14       /* Tolerance for GMRES residual */
@@ -71,11 +70,12 @@ void HPL_pir
 /*
  * .. Local Variables ..
  */
-   int                i, j;
+   int                i, j, sizeA;
    int                mp, nq, n, nb, npcol, nprow, myrow, mycol, tarcol, info[3];
-   int                rmp, rnq;
-   double           * Bptr, *factors, *res, *d, *preL, *preU;
+   double           * Bptr, *res, *d;
+   void             * vptr;
    double             norm;
+   HPL_T_pdmat        factors;
 
 /* ..
  * .. Executable Statements ..
@@ -83,58 +83,30 @@ void HPL_pir
    mp = A->mp; nq = A->nq-1; n = A->n; nb = A->nb;
    npcol = GRID->npcol; nprow = GRID->nprow;
    mycol = GRID->mycol; myrow = GRID->myrow;
-   
+
+   /* point to rhs area */
    Bptr  = Mptr( A->A,  0, nq, A->ld );
+
+   /* factors to contain LU factors in double precision */
+   factors.mp = mp; factors.nq = nq; factors.n = n;
+   factors.ld = A->ld; factors.nb = nb; factors.info = 0;
 
 /*
  * allocate  space  for  factors, which  contains LU factors of  double
  * precision, which is in fact of lower precision, just stored in double. 
- * And preU and preL which contains the preconditioning matrices U-1 and L-1.
- * preL adn preU in fact contains the inverses of L and U that are stored in factors.
  */
 
-   /* IMPORTANT!:: There may be some incomplete blocks at the rightest column and 
-    * bottom-est row. In order to treat them the same way as complete blocks, append
-    * some columns of 0s to the right and bottom. So local mp and nq of those 
-    * processes who contain incomplete blocks will be expanded into rmp and rnq.
-    * 
-    * First calculate rmp adn and rnq
-    */
-   rmp = mp; rnq = nq;
-   if (n % nb != 0)
-   {/* so there are some incomplete blocks */
+   vptr = (void*)malloc( ( (size_t)(ALGO->align) + 
+                           (size_t)(A->ld+1) * (size_t)(A->nq) ) *
+                         sizeof(double) );
 
-      /* determine which process column/row contains the incomplete blocks */
-      i = HPL_indxg2p((n/nb)*nb, nb, nb, 0, nprow);
-      j = HPL_indxg2p((n/nb)*nb, nb, nb, 0, npcol);
-      /* and expand mp and nq in these processes */
-      if (myrow == i)
-      {
-         rmp += nb - n % nb;
-      }
-      if (mycol == j)
-      {
-         rnq += nb - n % nb;
-      }
-   }
+   factors.A  = (double *)HPL_PTR( vptr,((size_t)(ALGO->align) * sizeof(double) ) );
+   factors.X  = Mptr( factors.A, 0, A->nq, A->ld );
 
-   /* allocate spaces, and set 0s */
-   factors = (double*)malloc( rmp * rnq * sizeof(double) );
-   memset(factors, 0, rmp * rnq * sizeof(double));
-   preL    = (double*)malloc( rmp * rnq * sizeof(double) );
-   memset(preL,    0, rmp * rnq * sizeof(double));
-   preU    = (double*)malloc( rmp * rnq * sizeof(double) );
-   memset(preU,    0, rmp * rnq * sizeof(double));
-
-/*
- * Convert L and U into double precision for further operations
- */
-   for (j = 0; j < nq; ++j)
-   {
-      for (i = 0; i < mp; ++i)
-      {
-         *Mptr(factors, i, j, rmp) = (double)*Mptr(FA->A, i, j, FA->ld);
-      }
+   /* convert low-precision FA into double precision factors */
+   sizeA = A->nq*A->ld;
+   for(int i=0;i<sizeA;++i){
+      *(factors.A+i)=(double)*(FA->A+i);
    }
 /*
  * Convert initial solution ( which is obtained through lower precision 
@@ -148,36 +120,16 @@ void HPL_pir
 /*
  * allocate space for residual vector, correction vectors.
  */
-   res = (double*)malloc((size_t)mp * sizeof(double));
-   d   = (double*)malloc((size_t)nq * sizeof(double));
+   res = (double*)malloc(mp * sizeof(double));
+   d   = (double*)malloc(nq * sizeof(double));
+   memset(res, 0, mp * sizeof(double));
+   memset(d, 0, nq * sizeof(double));
 
-/*
- * parallelly calculate preconditioning matrix: pre = U-1L-1
- */
-
-/* 
- * calculate U-1 by Gaussian Eliminations, that is to transform:
- *    U-1[U, I] => [I, U-1], in parallel.
- */
-   cal_pre(GRID, factors, preL, preU, mp, nq, rmp, n, nb);
-   // if (GRID->iam == 0)
-   // {
-   //    printf("----------------------------------------------------------------\n");
-   //    for (i = 0; i < mp; ++i)
-   //    {
-   //       for (j = 0; j < nq; ++j)
-   //       {
-   //          printf("%8f, ", *Mptr(preU, i, j, rmp));
-   //       }
-   //       printf("\n");
-   //    }
-   //    printf("================================================================\n");
-   //    fflush(stdout);
-   // }
 /*
  * tarcol is the process column containing b
  */
    tarcol = HPL_indxg2p( n, nb, nb, 0, npcol ); 
+   
 /*
  * Iterative Refinement
  */
@@ -198,22 +150,22 @@ void HPL_pir
       else { for( j = 0; j < mp; j++ ) res[j] = HPL_rzero; }
       
       if (mp > 0)
-         HPL_all_reduce( res, A->mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
+         HPL_all_reduce( res, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
       
       norm = 0;
-      for (j = 0; j < nq; ++j)
+      for (j = 0; j < mp; ++j)
       {
          norm += res[j]*res[j];
       }
       HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
-      if (GRID->iam == 0)
-         printf("%.16f\n", norm);
+      // if (GRID->iam == 0)
+      //    printf("%.16f\n", norm);
 
    /* 
     * Solve correction  equation using preconditioned  GMRES  method in mix
     * precision.  
     */
-      HPL_pgmres(GRID, A, preL, preU, rmp, res, d, TOL, MM, MAXIT);
+      HPL_pgmres(GRID, A, &factors, res, d, TOL, MM, MAXIT);
 
    /* 
     * update X with d
@@ -234,9 +186,7 @@ void HPL_pir
 
    /* free dynamic memories */
    if (d)         free(d);
-   if (preL)      free(preL);
-   if (preU)      free(preU);
-   if (factors)   free(factors);
+   if (vptr)      free(vptr);
    if (res)       free(res);
 
 /*

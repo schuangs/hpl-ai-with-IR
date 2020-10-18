@@ -136,7 +136,7 @@ void HPL_pdgesv
  * Solve upper triangular system
  */
 
-   if( A->info == 0 ) HPL_pdtrsv( GRID, A);
+   if( A->info == 0 ) HPL_pstrsv( GRID, A);
 
 // if (GRID->myrow == 1 && GRID->mycol == 0)
 // {

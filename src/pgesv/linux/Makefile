@@ -65,7 +65,7 @@ HPL_pgeobj       = \
    HPL_pdupdateNN.o       HPL_pdupdateNT.o       HPL_pdupdateTN.o       \
    HPL_pdupdateTT.o       HPL_pdtrsv.o           HPL_pdgesv0.o          \
    HPL_pdgesvK1.o         HPL_pdgesvK2.o         HPL_pdgesv.o			\
-   HPL_pLstrsv.o
+   HPL_pLdtrsv.o
 #
 ## Targets #############################################################
 #
@@ -128,8 +128,8 @@ HPL_pdgesvK2.o         : ../HPL_pdgesvK2.c         $(INCdep)
 	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pdgesvK2.c
 HPL_pdgesv.o           : ../HPL_pdgesv.c           $(INCdep)
 	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pdgesv.c
-HPL_pLstrsv.o           : ../HPL_pLstrsv.c         $(INCdep)
-	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pLstrsv.c
+HPL_pLdtrsv.o           : ../HPL_pLdtrsv.c         $(INCdep)
+	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pLdtrsv.c
 #
 # ######################################################################
 #
