@@ -26,7 +26,7 @@ double sign(double x)
  *   v <- Jk-1Jk-2...J1J0v
  * 
  * 2. solve for Jk:
- *   s.t. Jkv = (v0,v1,...,vk-2,somevalue,0,...,0)
+ *   s.t. Jkv = (v0,v1,...,vk-1,somevalue,0,...,0)
  * 
  * 3. perform:
  *   v <- Jkv
@@ -240,9 +240,9 @@ void applyHouseholder
     HPL_T_grid *                    GRID,       /* processes grid information */
     HPL_T_pdmat *                   A,          /* local A */
     const double *                  x,          /* local object vector pointer */
-    double *                        u,          /* local result Householder Vector */
+    const double *                  u,          /* local result Householder Vector */
     const int                       k,          /* order of the Householder */
-    double *                        y          /* target vector */
+    double *                        y           /* target vector */
 )
 {
     /* local variables */
@@ -279,17 +279,17 @@ void applyHouseholder
 }
 
 /*
- * redX2B()
+ * redB2X()
  * 
- * when performing A*v, if v is distributed along different columns like x, some redistributions
- * needed to perform to make v distributed along different rows like b.
+ * when performing A*v, if v is distributed along different rows like b, some redistributions
+ * needed to perform to make v distributed along different columns like x.
  */
-void redX2B
+void redB2X
 (
     HPL_T_grid *                     GRID,
     HPL_T_pdmat *                    A,          /* local A */
-    const double *                   v,          /* the vector to be redistributed, size: nq */
-    double *                         vc          /* the target space, size: mp */
+    const double *                   v,          /* the vector to be redistributed, size: mp */
+    double *                         vc          /* the target space, size: nq */
 )
 {
     int ig, i, j, jp;
@@ -313,17 +313,17 @@ void redX2B
 }
 
 /*
- * redR2C()
+ * redX2B()
  * 
- * v is distributed along different rows like b, some redistributions
+ * v is distributed along different columns like x, some redistributions
  * needed to perform to make v distributed along different columns like x.
  */
-void redB2X
+void redX2B
 (
     HPL_T_grid *                     GRID,
     HPL_T_pdmat *                    A,          /* local A */
-    const double *                   v,          /* the vector to be redistributed, size: mp */
-    double *                         vc          /* the target space, size: nq */
+    const double *                   v,          /* the vector to be redistributed, size: nq */
+    double *                         vc          /* the target space, size: mp */
 )
 {
     int ig, i, j, jp;
@@ -364,6 +364,7 @@ int HPL_pgmres
     const int                        MAXIT       /* maximum # of total iteration */
 )
 {
+    int prec = 0; /* whether or not to precondition, for debugging */
     /* local variables */
     int i, j, k = 0, start, ready = 0, index, pindex, tarcol;
     double norm, currenterror, tmp;
@@ -392,22 +393,27 @@ int HPL_pgmres
 
 
     /* solve Lx = b, then x = L-1b, x is returned at factors->X, which is replicated in process rows */
-    if (GRID->mycol == tarcol)
-    {
-        memcpy(bptr, b, mp*sizeof(double));
-    }
-    HPL_pLdtrsv(GRID, factors);
+    if (prec)
+    {   
+        if (GRID->mycol == tarcol)
+        {
+            memcpy(bptr, b, mp*sizeof(double));
+        }
+        HPL_pLdtrsv(GRID, factors);
 
-    /* redistribute x into column-distributing pattern for next pdtrsv */
-    redX2B(GRID, factors, factors->X, rhs);
-
-    /* solve Ux = b, then x = U-1b */
-    if (GRID->mycol == tarcol)
-    {
-        memcpy(bptr, rhs, mp*sizeof(double));
+        /* redistribute x into column-distributing pattern for next pdtrsv */
+        redX2B(GRID, factors, factors->X, rhs);
+    
+        /* solve Ux = b, then x = U-1b */
+        if (GRID->mycol == tarcol)
+        {
+            memcpy(bptr, rhs, mp*sizeof(double));
+        }
+        HPL_pdtrsv(GRID, factors);
+        redX2B(GRID, factors, factors->X, rhs);
+    } else {
+        memcpy(rhs, b, mp*sizeof(double));
     }
-    HPL_pdtrsv(GRID, factors);
-    redX2B(GRID, factors, factors->X, rhs);
 
     /* no initial guess so the first residual r0 is just b */
     memcpy(v, rhs, mp*sizeof(double));
@@ -453,19 +459,22 @@ int HPL_pgmres
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
             /* preconditioning A */
-            if (GRID->mycol == tarcol)
+            if (prec)
             {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pLdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
+                if (GRID->mycol == tarcol)
+                {
+                    memcpy(bptr, v, mp*sizeof(double));
+                }
+                HPL_pLdtrsv(GRID, factors);
+                redX2B(GRID, factors, factors->X, v);
 
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
+                if (GRID->mycol == tarcol)
+                {
+                    memcpy(bptr, v, mp*sizeof(double));
+                }
+                HPL_pdtrsv(GRID, factors);
+                redX2B(GRID, factors, factors->X, v);
             }
-            HPL_pdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
 
             /* v = rhs - v = rhs - Ax */
             for (i = 0; i < mp; ++i)
@@ -505,19 +514,22 @@ int HPL_pgmres
             HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
             /* preconditioning A */
-            if (GRID->mycol == tarcol)
+            if (prec)
             {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pLdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
+                if (GRID->mycol == tarcol)
+                {
+                    memcpy(bptr, v, mp*sizeof(double));
+                }
+                HPL_pLdtrsv(GRID, factors);
+                redX2B(GRID, factors, factors->X, v);
 
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
+                if (GRID->mycol == tarcol)
+                {
+                    memcpy(bptr, v, mp*sizeof(double));
+                }
+                HPL_pdtrsv(GRID, factors);
+                redX2B(GRID, factors, factors->X, v);
             }
-            HPL_pdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
 
             /* apply last k + 1 Householder transformations: 
                 that is : v = PkPk-1...P0AP0P1...Pkek*/
@@ -608,19 +620,22 @@ int HPL_pgmres
         HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
         /* preconditioning A */
-        if (GRID->mycol == tarcol)
+        if (prec)
         {
-            memcpy(bptr, v, mp*sizeof(double));
-        }
-        HPL_pLdtrsv(GRID, factors);
-        redX2B(GRID, factors, factors->X, v);
+            if (GRID->mycol == tarcol)
+            {
+                memcpy(bptr, v, mp*sizeof(double));
+            }
+            HPL_pLdtrsv(GRID, factors);
+            redX2B(GRID, factors, factors->X, v);
 
-        if (GRID->mycol == tarcol)
-        {
-            memcpy(bptr, v, mp*sizeof(double));
+            if (GRID->mycol == tarcol)
+            {
+                memcpy(bptr, v, mp*sizeof(double));
+            }
+            HPL_pdtrsv(GRID, factors);
+            redX2B(GRID, factors, factors->X, v);
         }
-        HPL_pdtrsv(GRID, factors);
-        redX2B(GRID, factors, factors->X, v);
 
         /* v = rhs - v = rhs - Ax */
         for (i = 0; i < mp; ++i)

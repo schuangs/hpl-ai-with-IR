@@ -86,15 +86,14 @@ void HPL_pdtrsv
 /*
  * Move the rhs in the process column owning the first column of A.
  */
+   /* np and nq are the local dimensions of of A */
    Mnumroc( np, n, nb, nb, myrow, 0, nprow );
    Mnumroc( nq, n, nb, nb, mycol, 0, npcol );
 
    Anp = 0; Anq = 0;
 
-   /* index of the process containing the first block */
    Alrow = 0;
    Alcol = 0;
-   /* width of first block */
    kb = Mmin(n, nb);
 
    Aptr = (double *)(A); XC = Mptr( Aptr, 0, nq, lda );
@@ -109,12 +108,19 @@ void HPL_pdtrsv
    }
    Rmsgid = ( Rmsgid + 2 >
               MSGID_END_PTRSV ? MSGID_BEGIN_PTRSV : Rmsgid + 2 );
+   
+   /* other rhs area set to 0 */
    if( mycol != Alcol )
    { for( tmp1=0; tmp1 < np; tmp1++ ) XC[tmp1] = HPL_rzero; }
 /*
- * Set up lookahead
+ * Set up lookahead, that is to perform iteration on the first block column
  */
+
+   /* n1 is the global distance between two neighboring blocks of the same
+       process in a block row */
    n1 = ( npcol - 1 ) * nb; n1 = Mmax( n1, nb );
+
+   /* allocate work space */
    if( np > 0 )
    {
       W = (double*)malloc( (size_t)(Mmin( n1, np )) * sizeof( double ) );
@@ -123,11 +129,12 @@ void HPL_pdtrsv
       Wfr = 1;
    }
 
+   /* previous version of parameters */
    Anpprev = Anp; Xdprev = Xd = XR; Aprev = Aptr;
    tmp1    = kb; tmp2 = Mmin( n - kb, n1 );
    MnumrocI( n1pprev, tmp2, Mmin( N, tmp1 ), nb, nb, myrow, 0, nprow );
 
-   /* update local variabels */
+   /* update local variables */
    if( myrow == Alrow ) { Anp += kb; }
    if( mycol == Alcol )
    {
@@ -142,7 +149,7 @@ void HPL_pdtrsv
       Xd += kb; Anq += kb; Aptr += lda * kb;
    }
 
-   /* update uniform variables */
+   /* update global variables */
    rowprev = Alrow; Alrow = MModAdd1( Alrow, nprow );
    colprev = Alcol; Alcol = MModAdd1( Alcol, npcol );
    kbprev  = kb; n -= kb;
@@ -181,10 +188,10 @@ void HPL_pdtrsv
          if( n1pprev > 0 )
          {
             HPL_dgemv( HplColumnMajor, HplNoTrans, n1pprev, kbprev,
-                       -HPL_rone, Aprev+Anpprev, lda, Xdprev, 1, HPL_rone,
-                       XC+Anpprev, 1 );
+                       -HPL_rone, Aprev+Anp, lda, Xdprev, 1, HPL_rone,
+                       XC+Anp, 1 );
             if( GridIsNotPx1 )
-               (void) HPL_dsend( XC+Anpprev, n1pprev, Alcol, Rmsgid, Rcomm );
+               (void) HPL_dsend( XC+Anp, n1pprev, Alcol, Rmsgid, Rcomm );
          }
 /*
  * Finish  the (decreasing-ring) broadcast of the solution block in pre-
@@ -204,7 +211,7 @@ void HPL_pdtrsv
          if( n1pprev > 0 )
          {
             (void) HPL_drecv( W, n1pprev, colprev, Rmsgid, Rcomm );
-            HPL_daxpy( n1pprev, HPL_rone, W, 1, XC+Anpprev, 1 );
+            HPL_daxpy( n1pprev, HPL_rone, W, 1, XC+Anp, 1 );
          }
       }
 /*
@@ -214,7 +221,7 @@ void HPL_pdtrsv
       {
          HPL_dtrsv( HplColumnMajor, HplLower, HplNoTrans, HplUnit,
                     kb, Aptr+Anp, lda, XC+Anp, 1 );
-         HPL_dcopy( kb, XC+Anp, 1, XR+Anq, 1 );
+         HPL_dcopy( kb, XC+Anp, 1, Xd, 1 );
       }
 /*
  *  Finish previous update
@@ -222,6 +229,7 @@ void HPL_pdtrsv
       if( ( mycol == colprev ) && ( ( tmp1 =  Anp + n1pprev ) < np ) )
          HPL_dgemv( HplColumnMajor, HplNoTrans, np - tmp1, kbprev, -HPL_rone,
                     Aprev + tmp1, lda, Xdprev, 1, HPL_rone, XC + tmp1, 1 );
+                    
 /*
  *  Save info of current step and update info for the next step
  */
@@ -249,7 +257,7 @@ void HPL_pdtrsv
  * Replicate last solution block
  */
    if( mycol == colprev )
-      (void) HPL_broadcast( (void *)(XR + Anpprev), kbprev, HPL_DOUBLE, rowprev,
+      (void) HPL_broadcast( (void *)Xdprev, kbprev, HPL_DOUBLE, rowprev,
                             Ccomm );
 
    if( Wfr  ) free( W  );

@@ -14,10 +14,10 @@
 
 # include <math.h>
 
-#define IR 10
+#define IR 1
 
 #define TOL 1e-14       /* Tolerance for GMRES residual */
-#define MM 50            /* restart size for GMRES */
+#define MM 20            /* restart size for GMRES */
 #define MAXIT 100       /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
@@ -84,11 +84,10 @@ void HPL_pir
    npcol = GRID->npcol; nprow = GRID->nprow;
    mycol = GRID->mycol; myrow = GRID->myrow;
 
-   /* point to rhs area */
+   /* point to local rhs area */
    Bptr  = Mptr( A->A,  0, nq, A->ld );
 
-   /* factors to contain LU factors in double precision */
-   factors.mp = mp; factors.nq = nq; factors.n = n;
+   factors.mp = mp; factors.nq = A->nq; factors.n = n;
    factors.ld = A->ld; factors.nb = nb; factors.info = 0;
 
 /*
@@ -101,7 +100,7 @@ void HPL_pir
                          sizeof(double) );
 
    factors.A  = (double *)HPL_PTR( vptr,((size_t)(ALGO->align) * sizeof(double) ) );
-   factors.X  = Mptr( factors.A, 0, A->nq, A->ld );
+   factors.X  = Mptr( factors.A, 0, factors.nq, factors.ld );
 
    /* convert low-precision FA into double precision factors */
    sizeA = A->nq*A->ld;
@@ -135,6 +134,8 @@ void HPL_pir
  */
    for(i = 0; i < IR; ++i)
    {
+      if (GRID->iam == 0)
+         printf("IR: %d\n", i);
       /* Calculate residual in double precision */
       if( mycol ==  tarcol)
       {
@@ -158,6 +159,7 @@ void HPL_pir
          norm += res[j]*res[j];
       }
       HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
+      norm = sqrt(norm);
       // if (GRID->iam == 0)
       //    printf("%.16f\n", norm);
 
