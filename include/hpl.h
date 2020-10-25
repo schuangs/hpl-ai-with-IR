@@ -92,6 +92,45 @@
 #include "hpl_ptest.h"
 #include "hpl_pir.h"
 
+inline void print_vector
+(
+   const double *    vptr,
+   int         n,
+   int         inc
+)
+{
+   int         i;
+   printf("\n[");
+   for (i = 0; i < n - 1; ++i)
+   {
+      printf("%.16f, ", *(vptr + i*inc));
+   }
+   printf("%.16f]\n", *(vptr + i*inc));
+}
+
+inline void print_matrix
+(
+   const double *    mptr,
+   int         m,
+   int         n,
+   int         lda,
+   int         inc
+)
+{
+   int         i, j;
+   printf("\n");
+   for (i = 0; i < m; ++i)
+   {
+      printf("\n|");
+      for (j = 0; j < n-1; ++j)
+      {
+         printf("%.16f, ", *(mptr + i*inc + j*lda));
+      }
+      printf("%.16f|\n", *(mptr + i*inc + j*lda));
+   }
+   printf("\n");
+}
+
 #endif
 /*
  * End of hpl.h

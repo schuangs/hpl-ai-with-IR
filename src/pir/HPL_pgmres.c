@@ -293,40 +293,6 @@ void redB2X
 )
 {
     int ig, i, j, jp;
-    for (i = 0; i < A->mp; ++i)
-    {
-        /* find the global index of local vc[i] */
-        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
-
-        /* find the process column and local index of the element vc[i] stored in v */
-        HPL_indxg2lp(&j, &jp, ig, A->nb, A->nb, 0, GRID->npcol);
-        
-        /* there is one and only one process who contains both vc[i] and v[j] in */
-        if (GRID->mycol == jp)
-        {
-            /* perform local replication */
-            vc[i] = v[j];
-        }
-        /* broadcast the correct vc to other processes in the rows */
-        HPL_broadcast(&vc[i], 1, HPL_DOUBLE, jp, GRID->row_comm);
-    }
-}
-
-/*
- * redX2B()
- * 
- * v is distributed along different columns like x, some redistributions
- * needed to perform to make v distributed along different columns like x.
- */
-void redX2B
-(
-    HPL_T_grid *                     GRID,
-    HPL_T_pdmat *                    A,          /* local A */
-    const double *                   v,          /* the vector to be redistributed, size: nq */
-    double *                         vc          /* the target space, size: mp */
-)
-{
-    int ig, i, j, jp;
     for (i = 0; i < A->nq-1; ++i)
     {
         /* find the global index of local vc[i] */
@@ -347,6 +313,40 @@ void redX2B
     }
 }
 
+/*
+ * redX2B()
+ * 
+ * v is distributed along different columns like x, some redistributions
+ * needed to perform to make v distributed along different columns like b.
+ */
+void redX2B
+(
+    HPL_T_grid *                     GRID,
+    HPL_T_pdmat *                    A,          /* local A */
+    const double *                   v,          /* the vector to be redistributed, size: nq */
+    double *                         vc          /* the target space, size: mp */
+)
+{
+    int ig, i, j, jp;
+    for (i = 0; i < A->mp; ++i)
+    {
+        /* find the global index of local vc[i] */
+        ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+
+        /* find the process column and local index of the element vc[i] stored in v */
+        HPL_indxg2lp(&j, &jp, ig, A->nb, A->nb, 0, GRID->npcol);
+        
+        /* there is one and only one process who contains both vc[i] and v[j] in */
+        if (GRID->mycol == jp)
+        {
+            /* perform local replication */
+            vc[i] = v[j];
+        }
+        /* broadcast the correct vc to other processes in the rows */
+        HPL_broadcast(&vc[i], 1, HPL_DOUBLE, jp, GRID->row_comm);
+    }
+}
+
 
 /*
  *  HPL_pgmres():
@@ -364,7 +364,7 @@ int HPL_pgmres
     const int                        MAXIT       /* maximum # of total iteration */
 )
 {
-    int prec = 0; /* whether or not to precondition, for debugging */
+    int prec = 1; /* whether or not to precondition, for debugging */
     /* local variables */
     int i, j, k = 0, start, ready = 0, index, pindex, tarcol;
     double norm, currenterror, tmp;

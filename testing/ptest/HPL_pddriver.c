@@ -49,47 +49,6 @@
  */
 #include "hpl.h"
 
-void print_vector
-(
-   double *    vptr,
-   int         n,
-   int         inc
-)
-{
-   int         i;
-   printf("\n[");
-   for (i = 0; i < n - 1; ++i)
-   {
-      printf("%.5f, ", *(vptr + i*inc));
-   }
-   printf("%.5f]\n", *(vptr + i*inc));
-}
-
-void print_matrix
-(
-   double *    mptr,
-   int         m,
-   int         n,
-   int         lda,
-   int         inc
-)
-{
-   int         i, j;
-   printf("\n");
-   for (i = 0; i < m; ++i)
-   {
-      printf("\n|");
-      for (j = 0; j < n-1; ++j)
-      {
-         printf("%.5f, ", *(mptr + i*inc + j*lda));
-      }
-      printf("%.5f|\n", *(mptr + i*inc + j*lda));
-   }
-   printf("\n");
-}
-
-
-
 #ifdef STDC_HEADERS
 int main
 (

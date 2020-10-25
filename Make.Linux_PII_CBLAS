@@ -67,7 +67,7 @@ ARCH         = Linux_PII_CBLAS
 # - HPL Directory Structure / HPL library ------------------------------
 # ----------------------------------------------------------------------
 #
-TOPdir       = $(HOME)/Desktop/mix_precision/codes/HPL_FILE/hpl-2.3-s4
+TOPdir       = $(HOME)/Desktop/mix_precision/codes/HPL_FILE/hpl-2.3-s4 
 INCdir       = $(TOPdir)/include
 BINdir       = $(TOPdir)/bin/$(ARCH)
 LIBdir       = $(TOPdir)/lib/$(ARCH)
