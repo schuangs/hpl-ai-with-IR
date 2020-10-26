@@ -79,7 +79,7 @@ void givens_rotations
                 v[ii] = cosus[i]*v[ii] - sinus[i]*tmp;
             }
             if (GRID->myrow == pi1)
-            {   
+            { 
                 /* update v */
                 HPL_drecv(&tmp,    1, pi, 0, GRID->col_comm);
                 HPL_dsend(&v[ii1], 1, pi, 0, GRID->col_comm);
@@ -151,7 +151,7 @@ void givens_rotations
                 /* just perform local R update on process row 0 */
                 *Mptr(R, i, k, MM) = v[ii];
             }
-        }
+        } 
         else
         {/* if v[i] is in another process row */
             if (GRID->myrow == pi)
@@ -576,10 +576,10 @@ int HPL_pgmres
             tmp = w[k+1];
             /* store the current error */
             currenterror = fabs(tmp);
-            // HPL_barrier(GRID->all_comm);
-            // if (GRID->iam == 0)
-            // printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
-            // HPL_barrier(GRID->all_comm);
+            HPL_barrier(GRID->all_comm);
+            if (GRID->iam == 0)
+            printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
+            HPL_barrier(GRID->all_comm); 
             /* check if the solution is good enough */
             if(currenterror < TOL)
             {
@@ -593,11 +593,21 @@ int HPL_pgmres
         if(k == MM)
         {
             --k;
-        }
+        } 
 
+        // print_vector(w, MM, 1);
+        if (GRID->iam == 0)
+        {
+            printf("Before:\n");
+            print_vector(w, MM, 1); 
+        }
         /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
         HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k+1, R, MM, w, 1);
-
+        if (GRID->iam == 0)
+        {
+            printf("After:\n");
+            print_vector(w, MM, 1); 
+        }
         /* calculate the new solution */
         for(i = 0; i <= k; ++i)
         {
@@ -623,11 +633,11 @@ int HPL_pgmres
             }
         }
 
-        // HPL_barrier(GRID->all_comm);
-        // if (GRID->iam == 0)
-        //     printf("currenterror = %.16f\n", currenterror);
-        // fflush(stdout);
-        // HPL_barrier(GRID->all_comm);
+        HPL_barrier(GRID->all_comm);
+        if (GRID->iam == 0)
+            printf("currenterror = %.16f\n", currenterror);
+        fflush(stdout);
+        HPL_barrier(GRID->all_comm);
 
         /* if the error is small enough, stop. 
             otherwise another iteration will be initiated. */

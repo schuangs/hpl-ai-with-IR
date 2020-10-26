@@ -17,6 +17,7 @@
 #define IR 5
 
 #define TOL 1e-13       /* Tolerance for GMRES residual */
+#define PRE 1e-15       /* solution tolerance */
 #define MM 27           /* restart size for GMRES */
 #define MAXIT 10       /* maximum number of GMRES iteration */
 
@@ -133,9 +134,8 @@ void HPL_pir
    for(i = 0; i < IR; ++i)
    {
       memset(res, 0, mp * sizeof(double));
-      memset(d, 0, nq * sizeof(double));
-      // if (GRID->iam == 0)
-      //    printf("IR Loop %d\n", i);
+      if (GRID->iam == 0)
+         printf("IR Loop %d\n", i);
       /* Calculate residual in double precision */
       if( mycol ==  tarcol)
       {
@@ -153,22 +153,23 @@ void HPL_pir
       if (mp > 0)
          HPL_all_reduce( res, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
       
-      // norm = 0;
-      // for (j = 0; j < mp; ++j)
-      // {
-      //    norm += res[j]*res[j];
-      // }
-      // HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
-      // norm = sqrt(norm);
-      // if (GRID->iam == 0)
-      //    printf("%.16f\n", norm);
+      norm = 0;
+      for (j = 0; j < mp; ++j)
+      {
+         norm += res[j]*res[j];
+      }
+      HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
+      norm = sqrt(norm);
+
+      if (norm < PRE)
+         break;      
 
    /* 
     * Solve correction  equation using preconditioned  GMRES  method in mix
     * precision.  
     */
+      memset(d, 0, nq * sizeof(double));
       HPL_pgmres(GRID, A, &factors, res, d, TOL, MM, MAXIT);
-
    /* 
     * update X with d
     */
@@ -176,14 +177,6 @@ void HPL_pir
       {
          *(A->X + j) += d[j];
       }
-      // if (GRID->iam == 0)
-      // {
-      //    for (int k = 0; k < mp; ++k)
-      //    {
-      //       printf("%.16f, ", (A->X)[k]);
-      //    }
-      //    printf("\n");
-      // }
    }
 
    /* free dynamic memories */
