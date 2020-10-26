@@ -98,6 +98,8 @@ void givens_rotations
     {/* if two elements in the same process row */ 
         if (GRID->myrow == pi)
         {
+        // if (ii1 >= A->mp)
+        // {printf("NO 6: out ii1 = %d, mp = %d, k = %d, nb = %d\n", ii1, A->mp, k, A->nb);fflush(stdout);}
             /* calculate sin and cos for Jk */
             cosus[k] = v[ii]   / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
             sinus[k] = -v[ii1] / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
@@ -123,6 +125,8 @@ void givens_rotations
         }
         if (GRID->myrow == pi1)
         {
+        //            if (ii1 >= A->mp)
+        // {printf("NO 8: out ii1 = %d, mp = %d, k = %d, nb = %d\n", ii1, A->mp, k, A->nb);fflush(stdout);}
             HPL_dsend(&v[ii1], 1, pi, 1, GRID->col_comm);
             v[ii1] = 0;
         }
@@ -211,7 +215,8 @@ void generateHouseholder
     HPL_reduce(&r, 1, HPL_DOUBLE, HPL_sum, pi, GRID->col_comm);
 
     if(myrow == pi)
-    {/* perform computation on process pi */
+    {
+        /* perform computation on process pi */
         /* calculate alpha and r */
         *alpha = -sign(x[i]) * sqrt(r);
         r = sqrt( 0.5*((*alpha)*(*alpha)-x[i]*(*alpha)));
@@ -377,7 +382,6 @@ int HPL_pgmres
     double * v   = (double*)malloc(mp*sizeof(double));
     double * u   = (double*)malloc(mp*sizeof(double));
     double * xt  = (double*)malloc(nq*sizeof(double));
-    // double * bt  = (double*)malloc(mp*sizeof(double));
     double * H   = (double*)malloc(mp*(MM+1)*sizeof(double));
     double * rhs = (double*)malloc(mp*sizeof(double));
 
@@ -440,7 +444,6 @@ int HPL_pgmres
     if(currenterror < TOL)
     {
         ready = 1;
-        memset(x, 0, nq*sizeof(double));
     }
 
 
@@ -490,6 +493,11 @@ int HPL_pgmres
         /* ------------------------------------------------ */
         for(k = 0; k < MM; ++k)
         {
+            if (k >= A->n-1)
+            {
+                --k;
+                break;
+            }
             /* store the current trasformation vector u in H */
             memcpy(Mptr(H, 0, k, mp), u, mp*sizeof(double));
 
@@ -570,7 +578,7 @@ int HPL_pgmres
             currenterror = fabs(tmp);
             // HPL_barrier(GRID->all_comm);
             // if (GRID->iam == 0)
-            // printf("Err: %.16f, Proc %d\n", currenterror, GRID->iam);fflush(stdout);
+            // printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
             // HPL_barrier(GRID->all_comm);
             /* check if the solution is good enough */
             if(currenterror < TOL)
@@ -606,58 +614,20 @@ int HPL_pgmres
                 applyHouseholder(GRID, A, v, Mptr(H, 0, j, mp), j, v);
             }
 
+            redB2X(GRID, A, v, xt);
+
             /* update x: perform x += yi*vi */
-            for (j = 0; j < mp; ++j)
+            for (j = 0; j < nq; ++j)
             {
-                x[j] += v[j]*w[i];
+                x[j] += xt[j]*w[i];
             }
         }
 
-        /* there is initial guess stored in x here from last iteration */
-            /* calculate v = Ax */
-        HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                A->A, A->ld, x, 1, 0, v, 1 );
-        HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-
-        /* preconditioning A */
-        if (prec)
-        {
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pLdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
-
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
-        }
-
-        /* v = rhs - v = rhs - Ax */
-        for (i = 0; i < mp; ++i)
-        {
-            v[i] = rhs[i] - v[i];
-        }
-
-        norm = 0;
-        /* calculate the norm of r0 */
-        for (i = 0; i < mp; ++i)
-        {
-            norm += v[i] * v[i];
-        }
-        HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
-        norm = sqrt(norm);
-
-        HPL_barrier(GRID->all_comm);
-        printf("Norm = %.16f, currenterror = %.16f\n", norm, currenterror);
-        fflush(stdout);
-        HPL_barrier(GRID->all_comm);
-
-
+        // HPL_barrier(GRID->all_comm);
+        // if (GRID->iam == 0)
+        //     printf("currenterror = %.16f\n", currenterror);
+        // fflush(stdout);
+        // HPL_barrier(GRID->all_comm);
 
         /* if the error is small enough, stop. 
             otherwise another iteration will be initiated. */

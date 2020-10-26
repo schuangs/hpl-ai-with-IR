@@ -14,11 +14,11 @@
 
 # include <math.h>
 
-#define IR 1
+#define IR 5
 
-#define TOL 1e-14       /* Tolerance for GMRES residual */
-#define MM 20            /* restart size for GMRES */
-#define MAXIT 100       /* maximum number of GMRES iteration */
+#define TOL 1e-13       /* Tolerance for GMRES residual */
+#define MM 27           /* restart size for GMRES */
+#define MAXIT 10       /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
 void HPL_pir
@@ -121,8 +121,6 @@ void HPL_pir
  */
    res = (double*)malloc(mp * sizeof(double));
    d   = (double*)malloc(nq * sizeof(double));
-   memset(res, 0, mp * sizeof(double));
-   memset(d, 0, nq * sizeof(double));
 
 /*
  * tarcol is the process column containing b
@@ -134,8 +132,10 @@ void HPL_pir
  */
    for(i = 0; i < IR; ++i)
    {
-      if (GRID->iam == 0)
-         printf("IR: %d\n", i);
+      memset(res, 0, mp * sizeof(double));
+      memset(d, 0, nq * sizeof(double));
+      // if (GRID->iam == 0)
+      //    printf("IR Loop %d\n", i);
       /* Calculate residual in double precision */
       if( mycol ==  tarcol)
       {
@@ -153,13 +153,13 @@ void HPL_pir
       if (mp > 0)
          HPL_all_reduce( res, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm );
       
-      norm = 0;
-      for (j = 0; j < mp; ++j)
-      {
-         norm += res[j]*res[j];
-      }
-      HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
-      norm = sqrt(norm);
+      // norm = 0;
+      // for (j = 0; j < mp; ++j)
+      // {
+      //    norm += res[j]*res[j];
+      // }
+      // HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm );
+      // norm = sqrt(norm);
       // if (GRID->iam == 0)
       //    printf("%.16f\n", norm);
 
