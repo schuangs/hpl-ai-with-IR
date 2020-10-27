@@ -101,16 +101,13 @@ void givens_rotations
         // if (ii1 >= A->mp)
         // {printf("NO 6: out ii1 = %d, mp = %d, k = %d, nb = %d\n", ii1, A->mp, k, A->nb);fflush(stdout);}
             /* calculate sin and cos for Jk */
-            cosus[k] = v[ii]   / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
+            cosus[k] = v[ii]   / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]); 
             sinus[k] = -v[ii1] / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
 
             /* update v */
             v[ii1] = 0;
             v[ii]  = cosus[k]*v[ii] - sinus[k]*v[ii1];
         }
-        /* broadcast sin and cos */
-        HPL_broadcast(&cosus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
-        HPL_broadcast(&sinus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
     }
     else
     {/* if two elements not in the same process row */
@@ -130,11 +127,12 @@ void givens_rotations
             HPL_dsend(&v[ii1], 1, pi, 1, GRID->col_comm);
             v[ii1] = 0;
         }
-        /* broadcast sin and cos */
-        HPL_broadcast(&cosus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
-        HPL_broadcast(&sinus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
     }
 
+    /* broadcast sin and cos */
+    HPL_broadcast(&cosus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
+    HPL_broadcast(&sinus[k], 1, HPL_DOUBLE, pi, GRID->col_comm);
+    
     /* update w */
     tmp    = cosus[k]*w[k] - sinus[k]*w[k+1];
     w[k+1] = sinus[k]*w[k] + cosus[k]*w[k+1];
@@ -194,7 +192,7 @@ void generateHouseholder
     int i, ig, mp = A->mp, pi;
     double r = 0;
 
-    for(i = 0; i < mp; i++)
+    for(i = 0; i < mp; ++i)
     {
         ig = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
         if(ig >= k)
@@ -330,7 +328,7 @@ void redX2B
     HPL_T_pdmat *                    A,          /* local A */
     const double *                   v,          /* the vector to be redistributed, size: nq */
     double *                         vc          /* the target space, size: mp */
-)
+) 
 {
     int ig, i, j, jp;
     for (i = 0; i < A->mp; ++i)
@@ -390,15 +388,15 @@ int HPL_pgmres
     double * sinus = (double*)malloc((MM+1)*sizeof(double));
     double * w     = (double*)malloc((MM+1)*sizeof(double));
     double * R     = (double*)malloc(MM*(MM+1)*sizeof(double));
+    memset(R, 0, MM*(MM+1)*sizeof(double));
+
+
 
     /* precondition b into rhs, that is: rhs = U-1L-1b */
-
     tarcol = HPL_indxg2p( factors->n, factors->nb, factors->nb, 0, GRID->npcol ); 
-
-
-    /* solve Lx = b, then x = L-1b, x is returned at factors->X, which is replicated in process rows */
     if (prec)
-    {   
+    {
+        /* solve Lx = b, then x = L-1b, x is returned at factors->X, which is replicated in process rows */
         if (GRID->mycol == tarcol)
         {
             memcpy(bptr, b, mp*sizeof(double));
@@ -478,7 +476,7 @@ int HPL_pgmres
                 HPL_pdtrsv(GRID, factors);
                 redX2B(GRID, factors, factors->X, v);
             }
-
+ 
             /* v = rhs - v = rhs - Ax */
             for (i = 0; i < mp; ++i)
             {
@@ -595,19 +593,22 @@ int HPL_pgmres
             --k;
         } 
 
-        // print_vector(w, MM, 1);
-        if (GRID->iam == 0)
-        {
-            printf("Before:\n");
-            print_vector(w, MM, 1); 
-        }
+        // if (GRID->iam == 0)
+        // {
+        //     printf("Before:\n");
+        //     printf("w = :\n");
+        //     print_vector(w, MM, 1); 
+        //     printf("R = :\n");
+        //     print_matrix(R, MM, MM, MM, 1);
+        // }
         /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
         HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k+1, R, MM, w, 1);
-        if (GRID->iam == 0)
-        {
-            printf("After:\n");
-            print_vector(w, MM, 1); 
-        }
+        // if (GRID->iam == 0)
+        // {
+        //     printf("After:\n");
+        //     printf("w = :\n");
+        //     print_vector(w, MM, 1); 
+        // }
         /* calculate the new solution */
         for(i = 0; i <= k; ++i)
         {
@@ -633,9 +634,44 @@ int HPL_pgmres
             }
         }
 
+
+        /* there is initial guess stored in x here from last iteration */
+        /* calculate v = Ax */
+        HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+                A->A, A->ld, x, 1, 0, v, 1 );
+        HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+
+        /* preconditioning A */
+        if (prec)
+        {
+            if (GRID->mycol == tarcol)
+            {
+                memcpy(bptr, v, mp*sizeof(double));
+            }
+            HPL_pLdtrsv(GRID, factors);
+            redX2B(GRID, factors, factors->X, v);
+
+            if (GRID->mycol == tarcol)
+            {
+                memcpy(bptr, v, mp*sizeof(double));
+            }
+            HPL_pdtrsv(GRID, factors);
+            redX2B(GRID, factors, factors->X, v); 
+        }
+
+        norm = 0;
+        /* v = rhs - v = rhs - Ax */
+        for (i = 0; i < mp; ++i)
+        {
+            v[i] = rhs[i] - v[i];
+            norm += v[i]*v[i];
+        } 
+
+        HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
+
         HPL_barrier(GRID->all_comm);
         if (GRID->iam == 0)
-            printf("currenterror = %.16f\n", currenterror);
+            printf("currenterror = %.16f, norm = %.16f\n", currenterror, norm);
         fflush(stdout);
         HPL_barrier(GRID->all_comm);
 

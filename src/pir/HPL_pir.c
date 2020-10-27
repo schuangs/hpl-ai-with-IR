@@ -18,7 +18,7 @@
 
 #define TOL 1e-13       /* Tolerance for GMRES residual */
 #define PRE 1e-15       /* solution tolerance */
-#define MM 27           /* restart size for GMRES */
+#define MM 25            /* restart size for GMRES */
 #define MAXIT 10       /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
@@ -107,7 +107,7 @@ void HPL_pir
    sizeA = A->nq*A->ld;
    for(int i=0;i<sizeA;++i){
       *(factors.A+i)=(double)*(FA->A+i);
-   }
+   } 
 /*
  * Convert initial solution ( which is obtained through lower precision 
  * LU factorization) into higher precision
