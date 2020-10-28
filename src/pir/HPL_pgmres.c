@@ -70,7 +70,7 @@ void givens_rotations
             }
         }
         else
-        {/* if two elememts in different process row, some communication required */
+        {/* if two elememts in different process rows, some communication required */
             if (GRID->myrow == pi)
             {
                 /* update v */
@@ -98,8 +98,11 @@ void givens_rotations
     {/* if two elements in the same process row */ 
         if (GRID->myrow == pi)
         {
-        // if (ii1 >= A->mp)
-        // {printf("NO 6: out ii1 = %d, mp = %d, k = %d, nb = %d\n", ii1, A->mp, k, A->nb);fflush(stdout);}
+            if (v[ii]*v[ii] + v[ii1]*v[ii1] == 0)
+            {
+                printf("Error: divided by zero in givens_rotations()\n");
+                return;
+            }
             /* calculate sin and cos for Jk */
             cosus[k] = v[ii]   / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]); 
             sinus[k] = -v[ii1] / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
@@ -116,14 +119,17 @@ void givens_rotations
         if (GRID->myrow == pi)
         {
             HPL_drecv(&tmp,   1, pi1, 1, GRID->col_comm);
+            if (v[ii]*v[ii] + tmp*tmp == 0)
+            {
+                printf("Error: divided by zero in givens_rotations()\n");
+                return;
+            }
             cosus[k]  = v[ii] / sqrt(v[ii]*v[ii] + tmp*tmp);
             sinus[k]  = -tmp  / sqrt(v[ii]*v[ii] + tmp*tmp);
             v[ii] = cosus[k]*v[ii] - sinus[k]*tmp;
         }
         if (GRID->myrow == pi1)
         {
-        //            if (ii1 >= A->mp)
-        // {printf("NO 8: out ii1 = %d, mp = %d, k = %d, nb = %d\n", ii1, A->mp, k, A->nb);fflush(stdout);}
             HPL_dsend(&v[ii1], 1, pi, 1, GRID->col_comm);
             v[ii1] = 0;
         }
@@ -388,8 +394,6 @@ int HPL_pgmres
     double * sinus = (double*)malloc((MM+1)*sizeof(double));
     double * w     = (double*)malloc((MM+1)*sizeof(double));
     double * R     = (double*)malloc(MM*(MM+1)*sizeof(double));
-    memset(R, 0, MM*(MM+1)*sizeof(double));
-
 
 
     /* precondition b into rhs, that is: rhs = U-1L-1b */
@@ -448,7 +452,7 @@ int HPL_pgmres
     /* ------------------------------------------------- */
     /*  Restart Iterations                               */
     /* ------------------------------------------------- */
-    for(start = 0; (start <= MAXIT) && !ready; ++start)
+    for(start = 0; (start < MAXIT) && !ready; ++start)
     {
         /* do the same as above to start the method */
         if(start)
@@ -544,23 +548,20 @@ int HPL_pgmres
                 applyHouseholder(GRID, A, v, Mptr(H, 0, i, mp), i, v);
             }
             /* generate and apply the last transformation */
-            if(k < A->n - 1)
-            {
-                generateHouseholder(GRID, A, v, u, k+1, &tmp);
+            generateHouseholder(GRID, A, v, u, k+1, &tmp);
 
-                /* apply this transformation: v<-Pk+1v */
-                HPL_indxg2lp(&index, &pindex, k+1, A->nb, A->nb, 0, GRID->nprow);
-                if (GRID->myrow == pindex)
+            /* apply this transformation: v<-Pk+1v */
+            HPL_indxg2lp(&index, &pindex, k+1, A->nb, A->nb, 0, GRID->nprow);
+            if (GRID->myrow == pindex)
+            {
+                v[index] = tmp;
+            }
+            for (i = 0; i < mp; ++i)
+            {
+                index = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
+                if (index > k + 1)
                 {
-                    v[index] = tmp;
-                }
-                for (i = 0; i < mp; ++i)
-                {
-                    index = HPL_indxl2g(i, A->nb, A->nb, GRID->myrow, 0, GRID->nprow);
-                    if (index > k + 1)
-                    {
-                        v[i] = 0;
-                    }
+                    v[i] = 0;
                 }
             }
 
@@ -594,7 +595,7 @@ int HPL_pgmres
         } 
 
         // if (GRID->iam == 0)
-        // {
+        // { 
         //     printf("Before:\n");
         //     printf("w = :\n");
         //     print_vector(w, MM, 1); 
@@ -668,6 +669,7 @@ int HPL_pgmres
         } 
 
         HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
+        norm = sqrt(norm);
 
         HPL_barrier(GRID->all_comm);
         if (GRID->iam == 0)
