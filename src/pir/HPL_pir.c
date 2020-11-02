@@ -14,12 +14,12 @@
 
 # include <math.h>
 
-#define IR 5
+#define IR 2
 
 #define TOL 1e-13       /* Tolerance for GMRES residual */
 #define PRE 1e-15       /* solution tolerance */
-#define MM 1            /* restart size for GMRES */
-#define MAXIT 10       /* maximum number of GMRES iteration */
+#define MM 50            /* restart size for GMRES */
+#define MAXIT 10        /* maximum number of GMRES iteration */
 
 #ifdef STDC_HEADERS
 void HPL_pir

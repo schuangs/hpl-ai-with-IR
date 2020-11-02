@@ -108,8 +108,8 @@ void givens_rotations
             sinus[k] = -v[ii1] / sqrt(v[ii]*v[ii] + v[ii1]*v[ii1]);
 
             /* update v */
-            v[ii1] = 0;
             v[ii]  = cosus[k]*v[ii] - sinus[k]*v[ii1];
+            v[ii1] = 0;
         }
     }
     else
@@ -575,10 +575,10 @@ int HPL_pgmres
             tmp = w[k+1];
             /* store the current error */
             currenterror = fabs(tmp);
-            HPL_barrier(GRID->all_comm);
-            if (GRID->iam == 0)
-            printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
-            HPL_barrier(GRID->all_comm); 
+            // HPL_barrier(GRID->all_comm);
+            // if (GRID->iam == 0)
+            // printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
+            // HPL_barrier(GRID->all_comm); 
             /* check if the solution is good enough */
             if(currenterror < TOL)
             {
@@ -636,46 +636,46 @@ int HPL_pgmres
         }
 
 
-        /* there is initial guess stored in x here from last iteration */
-        /* calculate v = Ax */
-        HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-                A->A, A->ld, x, 1, 0, v, 1 );
-        HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
+        // /* there is initial guess stored in x here from last iteration */
+        // /* calculate v = Ax */
+        // HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
+        //         A->A, A->ld, x, 1, 0, v, 1 );
+        // HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
 
-        /* preconditioning A */
-        if (prec)
-        {
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pLdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v);
+        // /* preconditioning A */
+        // if (prec)
+        // {
+        //     if (GRID->mycol == tarcol)
+        //     {
+        //         memcpy(bptr, v, mp*sizeof(double));
+        //     }
+        //     HPL_pLdtrsv(GRID, factors);
+        //     redX2B(GRID, factors, factors->X, v);
 
-            if (GRID->mycol == tarcol)
-            {
-                memcpy(bptr, v, mp*sizeof(double));
-            }
-            HPL_pdtrsv(GRID, factors);
-            redX2B(GRID, factors, factors->X, v); 
-        }
+        //     if (GRID->mycol == tarcol)
+        //     {
+        //         memcpy(bptr, v, mp*sizeof(double));
+        //     }
+        //     HPL_pdtrsv(GRID, factors);
+        //     redX2B(GRID, factors, factors->X, v); 
+        // }
 
-        norm = 0;
-        /* v = rhs - v = rhs - Ax */
-        for (i = 0; i < mp; ++i)
-        {
-            v[i] = rhs[i] - v[i];
-            norm += v[i]*v[i];
-        } 
+        // norm = 0;
+        // /* v = rhs - v = rhs - Ax */
+        // for (i = 0; i < mp; ++i)
+        // {
+        //     v[i] = rhs[i] - v[i];
+        //     norm += v[i]*v[i];
+        // } 
 
-        HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
-        norm = sqrt(norm);
+        // HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
+        // norm = sqrt(norm);
 
-        HPL_barrier(GRID->all_comm);
-        if (GRID->iam == 0)
-            printf("currenterror = %.16f, norm = %.16f\n", currenterror, norm);
-        fflush(stdout);
-        HPL_barrier(GRID->all_comm);
+        // HPL_barrier(GRID->all_comm);
+        // if (GRID->iam == 0)
+        //     printf("currenterror = %.16f, norm = %.16f\n", currenterror, norm);
+        // fflush(stdout);
+        // HPL_barrier(GRID->all_comm);
 
         /* if the error is small enough, stop. 
             otherwise another iteration will be initiated. */
