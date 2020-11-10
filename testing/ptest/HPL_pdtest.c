@@ -239,7 +239,7 @@ void HPL_pdtest
     */
    HPL_pdgesv( GRID, ALGO, &matt );
 
-   HPL_pir( GRID, ALGO, &mat, &matt );
+   // HPL_pir( GRID, ALGO, &mat, &matt );
 
    if(dev) printf("PDGESV Finished, MATT.INFO = %d\n",matt.info);
    HPL_ptimer( 0 );
