@@ -2,8 +2,10 @@
  * By Junkang Huang, November, 2020
  * 
  * based on the paper:
+ * 
  *  Matrices with Tunable Infinity-Norm Condition Number
  *  and No Need for Pivoting in LU Factorization
+ * 
  *    --- by Fasi Massimiliano and Higham Nicholas J.
  *    [MIMS EPrint 2020.17, 
  *     Manchester Institute for Mathematical Sciences,
@@ -16,7 +18,7 @@
 #include "hpl.h"
 
 /*
- * Generate matrix A with given alpha and beta parameters.
+ * Generate matrix A with alpha and beta parameters given.
  */
 void generateA
 (
@@ -30,6 +32,7 @@ void generateA
    const double                     scale
 )
 {
+/* Local variables */
    int iloc, jloc, jdisp, i, j, k1, k2, mp, nq;
    int myrow = GRID->myrow; int mycol = GRID->mycol;
    int nprow = GRID->nprow; int npcol = GRID->npcol;
@@ -37,7 +40,7 @@ void generateA
    double a = - alpha;
    double b = - beta;
 
-   /* local of local A */
+   /* shape of local A */
    Mnumroc( mp, N, NB, NB, myrow, 0, nprow );
    Mnumroc( nq, N, NB, NB, mycol, 0, npcol );
 
@@ -98,6 +101,10 @@ void calculate_ab
    *alpha = 0.5* *beta;
 }
 
+/* 
+ * HPL_generateA generates (or regenerates) a parallel N*N matrix A.
+ *  Matrix A is generated based on the method proposed by Fasi M..
+ */ 
 #ifdef STDC_HEADERS
 void HPL_generateA
 (
@@ -117,53 +124,109 @@ void HPL_generateA
    const int                        LDA;
 #endif
 {
-/* 
- * Purpose
- * =======
- *
- * HPL_generateA generates (or regenerates) a parallel N*N matrix A.
- *  Matrix A is generated based on the method proposed by Fasi M..
- *
- * Arguments
- * =========
- *
- * GRID    (local input)                 const HPL_T_grid *
- *         On entry,  GRID  points  to the data structure containing the
- *         process grid information.
- *
- *
- * N       (global input)                const int
- *         On entry,  N specifies the global size of the matrix A.
- *         N must be at least zero.
- *
- * NB      (global input)                const int
- *         On entry,  NB specifies the blocking factor used to partition
- *         and distribute the matrix A. NB must be larger than one.
- *
- * A       (local output)                double *
- *         On entry,  A  points  to an array of dimension (LDA,LocQ(N)).
- *         On  exit,  this  array  contains  the  coefficients  of  the 
- *         generated matrix.
- *
- * LDA     (local input)                 const int
- *         On entry, LDA specifies the leading dimension of the array A.
- *         LDA must be at least max(1,LocP(N)).
- *
- * ---------------------------------------------------------------------
- */ 
 /*
  * .. Local Variables ..
  */
 double alpha, beta, scale;
-
-/* ..
- * .. Executable Statements ..
- */
 
 /* calculate the alpha and beta parameters */
 calculate_ab(&alpha, &beta, N);
 
 /* scale the hole matrix as suggested */
 scale = 65504. / 2;
+/* generate matrix A with alpha, beta and scale */
 generateA(GRID, N, NB, A, LDA, alpha, beta, scale);
+
+/* End of HPL_generateA() */
+}
+
+
+/*
+ * Generate random right-hand side parallelly
+ * 
+ * The  pseudo-random  generator uses the linear congruential algorithm:
+ * X(n+1) = (a * X(n) + c) mod m  as  described  in the  Art of Computer
+ * Programming, Knuth 1973, Vol. 2.
+ * 
+ */
+#ifdef STDC_HEADERS
+void HPL_generateB
+(
+   const HPL_T_grid *               GRID,
+   const int                        N,
+   const int                        NB,
+   double *                         B,
+   const int                        ISEED
+)
+#else
+void HPL_generateB
+( GRID, N, NB, B, ISEED )
+   const HPL_T_grid *               GRID;
+   const int                        N;
+   const int                        NB;
+   double *                         B;
+   const int                        ISEED;
+#endif
+{
+/*
+ * .. Local Variables ..
+ */
+   int                        iadd [2], ia1  [2], ia2  [2], ib1  [2],
+                              ic1  [2], ic2  [2],
+                              iran1[2], iran2[2],
+                              itmp1[2], itmp2[2],
+                              jseed[2], mult [2];
+   int                        ib, iblk, ik, jump1, jump2,
+                              jump7, lmb, tarcol,
+                              mblks, mp, mycol, myrow,
+                              npcol, nprow;
+/* ..
+ * .. Executable Statements ..
+ */
+   (void) HPL_grid_info( GRID, &nprow, &npcol, &myrow, &mycol );
+
+/*
+ * tarcol is the process column containing b
+ */
+   tarcol = HPL_indxg2p( N, NB, NB, 0, npcol ); 
+   if (mycol != tarcol) return;
+
+   mult [0] = HPL_MULT0; mult [1] = HPL_MULT1;
+   iadd [0] = HPL_IADD0; iadd [1] = HPL_IADD1;
+   
+   jseed[0] = ISEED;     jseed[1] = 0;
+/*
+ * Generate an M by N matrix starting in process (0,0)
+ */
+   Mnumroc( mp, N, NB, NB, myrow, 0, nprow );
+
+/*
+ * Local number of blocks and size of the last one
+ */
+   mblks = ( mp + NB - 1 ) / NB; lmb = mp - ( ( mp - 1 ) / NB ) * NB;
+/*
+ * Compute multiplier/adder for various jumps in random sequence
+ */
+   jump1 = 1;  jump2 = nprow * NB; jump7 = myrow * NB;
+
+   HPL_xjumpm( jump1, mult, iadd, jseed, iran1, ia1,   ic1   );
+   HPL_xjumpm( jump2, mult, iadd, iran1, itmp1, ia2,   ic2   );
+   HPL_xjumpm( jump7, mult, iadd, iran1, iran1, itmp1, itmp2 );
+   HPL_setran( 0, iran1 ); HPL_setran( 1, ia1 ); HPL_setran( 2, ic1 );
+/*
+ * Save value of first number in sequence
+ */
+   ib1[0] = iran1[0]; ib1[1] = iran1[1];
+
+   for( iblk = 0; iblk < mblks; iblk++ )
+   {
+      ib = ( iblk == mblks - 1 ? lmb : NB );
+      for( ik = 0; ik < ib; B++, ik++ ) *B = HPL_rand();
+      HPL_jumpit( ia2, ic2, ib1, iran2 );
+      ib1[0] = iran2[0]; ib1[1] = iran2[1];
+   }
+
+/*
+ * End of HPL_generateB()
+ */
 }

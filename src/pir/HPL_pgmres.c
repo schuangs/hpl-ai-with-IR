@@ -709,5 +709,5 @@ int HPL_pgmres
     /* return total number of iterations performed */
     return (start * MM + k + 1);
 
-    /* end of pgmres() */
+    /* end of HPL_pgmres() */
 }

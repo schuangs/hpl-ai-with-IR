@@ -55,7 +55,7 @@ INCdep           = \
 ## Object files ########################################################
 #
 HPL_pmaobj       = \
-   HPL_pdmatgen.o
+   HPL_pdmatgen.o		HPL_generate.o
 #
 ## Targets #############################################################
 #
@@ -72,6 +72,8 @@ lib.grd : $(HPL_pmaobj)
 #
 HPL_pdmatgen.o         : ../HPL_pdmatgen.c         $(INCdep)
 	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_pdmatgen.c
+HPL_generate.o         : ../HPL_generate.c         $(INCdep)
+	$(CC) -o $@ -c $(CCFLAGS)  ../HPL_generate.c
 #
 # ######################################################################
 #

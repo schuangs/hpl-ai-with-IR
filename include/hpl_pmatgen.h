@@ -71,6 +71,24 @@ STDC_ARGS( (
    const int
 ) );
 
+void                             HPL_generateB
+STDC_ARGS( (
+   const HPL_T_grid *,
+   const int,
+   const int,
+   double *,
+   const int
+) );
+
+void                             HPL_generateA
+STDC_ARGS( (
+   const HPL_T_grid *,
+   const int,
+   const int,
+   double *,
+   const int
+) );
+
 #endif
 /*
  * End of hpl_pmatgen.h

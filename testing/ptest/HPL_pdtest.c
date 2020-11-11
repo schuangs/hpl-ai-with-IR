@@ -188,7 +188,9 @@ void HPL_pdtest
    mat.A  = (double *)HPL_PTR( vptr,
                                ((size_t)(ALGO->align) * sizeof(double) ) );
    mat.X  = Mptr( mat.A, 0, mat.nq, mat.ld );
-   HPL_pdmatgen( GRID, N, N+1, NB, mat.A, mat.ld, HPL_ISEED );
+   // HPL_pdmatgen( GRID, N, N+1, NB, mat.A, mat.ld, HPL_ISEED );
+   HPL_generateA( GRID, N, NB, mat.A, mat.ld );
+   HPL_generateB( GRID, N, NB, Mptr(mat.A, 0, nq, mat.ld), HPL_ISEED );
 
    // double to float
    void* fptr = (void*)malloc( ( (size_t)(ALGO->align) + 
@@ -239,7 +241,7 @@ void HPL_pdtest
     */
    HPL_pdgesv( GRID, ALGO, &matt );
 
-   // HPL_pir( GRID, ALGO, &mat, &matt );
+   HPL_pir( GRID, ALGO, &mat, &matt );
 
    if(dev) printf("PDGESV Finished, MATT.INFO = %d\n",matt.info);
    HPL_ptimer( 0 );
@@ -400,6 +402,7 @@ void HPL_pdtest
 
    //Float to double
    // printf("Come to Float to Double!\n");
+   // fflush(stdout);
    // int sizeAll = mat.nq * mat.ld;
    // for(int i=0;i<sizeAll;++i){
    //    *(mat.A+i)=(double)*(matt.A+i);
@@ -407,14 +410,16 @@ void HPL_pdtest
    // for(int i=0;i<mat.nq;++i){
    //    *(mat.X+i)=(double)*(matt.X+i);
    // }
-   if(dev) printf("Mat.A: %lf %lf",*(mat.A),*(mat.X));
+   // if(dev) printf("Mat.A: %lf %lf",*(mat.A),*(mat.X));
    // printf("Finish Float to Double!\n");
 /*
  * Check computation, re-generate [ A | b ], compute norm 1 and inf of A and x,
  * and norm inf of b - A x. Display residual checks.
  */
    if(dev) printf("Step1!\n");
-   HPL_pdmatgen( GRID, N, N+1, NB, mat.A, mat.ld, HPL_ISEED );
+   // HPL_pdmatgen( GRID, N, N+1, NB, mat.A, mat.ld, HPL_ISEED );
+   HPL_generateA( GRID, N, NB, mat.A, mat.ld );
+   HPL_generateB( GRID, N, NB, Mptr(mat.A, 0, nq, mat.ld), HPL_ISEED );
    Anorm1 = HPL_pdlange( GRID, HPL_NORM_1, N, N, NB, mat.A, mat.ld );
    AnormI = HPL_pdlange( GRID, HPL_NORM_I, N, N, NB, mat.A, mat.ld );
 /*
