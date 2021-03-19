@@ -95,7 +95,7 @@ void calculate_ab
    const int                  N
 )
 {
-   /* with infinite condition number k = 100 */
+   /* we choose infinite condition number k = 100 */
    const double V = 2.50;
    *beta = V / N;
    *alpha = 0.5* *beta;
@@ -105,7 +105,6 @@ void calculate_ab
  * HPL_generateA generates (or regenerates) a parallel N*N matrix A.
  *  Matrix A is generated based on the method proposed by Fasi M..
  */ 
-#ifdef STDC_HEADERS
 void HPL_generateA
 (
    const HPL_T_grid *               GRID,
@@ -113,17 +112,7 @@ void HPL_generateA
    const int                        NB,
    double *                         A,
    const int                        LDA
-)
-#else
-void HPL_generateA
-( GRID, N, NB, A, LDA)
-   const HPL_T_grid *               GRID;
-   const int                        N;
-   const int                        NB;
-   double *                         A;
-   const int                        LDA;
-#endif
-{
+) {
 /*
  * .. Local Variables ..
  */
@@ -149,7 +138,6 @@ generateA(GRID, N, NB, A, LDA, alpha, beta, scale);
  * Programming, Knuth 1973, Vol. 2.
  * 
  */
-#ifdef STDC_HEADERS
 void HPL_generateB
 (
    const HPL_T_grid *               GRID,
@@ -157,17 +145,7 @@ void HPL_generateB
    const int                        NB,
    double *                         B,
    const int                        ISEED
-)
-#else
-void HPL_generateB
-( GRID, N, NB, B, ISEED )
-   const HPL_T_grid *               GRID;
-   const int                        N;
-   const int                        NB;
-   double *                         B;
-   const int                        ISEED;
-#endif
-{
+) {
 /*
  * .. Local Variables ..
  */

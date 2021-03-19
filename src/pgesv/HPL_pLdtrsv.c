@@ -1,27 +1,24 @@
-
 /*
- * Include files
+ * By Junkang Huang, Dec. 2020
+ * 
+ * solving lower triangular system in parallel
+ * following the implementation:
+ *      HPL_pdtrsv() of HPL-2.3, which solves upper triangular system in parallel
+ * 
  */
 #include "hpl.h"
 
-#ifdef STDC_HEADERS
-void HPL_pLdtrsv
+
+void HPL_pLdtrsv 
 (
-   HPL_T_grid *                     GRID,
-   HPL_T_pdmat *                    AMAT
-)
-#else
-void HPL_pdtrsv
-( GRID, AMAT )
-   HPL_T_grid *                     GRID;
-   HPL_T_pmat *                     AMAT;
-#endif
-{
+   HPL_T_grid *                GRID,
+   HPL_T_pdmat *               AMAT
+) {
 /* 
  * Purpose
  * =======
  *
- * HPL_pdtrsv solves an lower triangular system of linear equations.
+ * HPL_pLdtrsv solves an lower triangular system of linear equations.
  *  
  * The rhs is the last column of the N by N+1 matrix A. The solve starts
  * in the process  column owning the  1th  column of A, so the rhs b may
@@ -30,21 +27,6 @@ void HPL_pdtrsv
  * the one owning  b. The result is  replicated in all process rows, and
  * returned in XR, i.e. XR is of size nq = LOCq( N ) in all processes.
  *  
- * The algorithm uses decreasing one-ring broadcast in process rows  and
- * columns  implemented  in terms of  synchronous communication point to
- * point primitives.  The  lookahead of depth 1 is used to minimize  the
- * critical path. This entire operation is essentially ``latency'' bound
- * and an estimate of its running time is given by:
- *  
- *    (move rhs) lat + N / ( P bdwth ) +            
- *    (solve)    ((N / NB)-1) 2 (lat + NB / bdwth) +
- *               gam2 N^2 / ( P Q ),                
- *  
- * where  gam2   is an estimate of the   Level 2 BLAS rate of execution.
- * There are  N / NB  diagonal blocks. One must exchange  2  messages of
- * length NB to compute the next  NB  entries of the vector solution, as
- * well as performing a total of N^2 floating point operations.
- *
  * Arguments
  * =========
  *
@@ -52,7 +34,7 @@ void HPL_pdtrsv
  *         On entry,  GRID  points  to the data structure containing the
  *         process grid information.
  *
- * AMAT    (local input/output)          HPL_T_pmat *
+ * AMAT    (local input/output)          HPL_T_pdmat *
  *         On entry,  AMAT  points  to the data structure containing the
  *         local array information.
  *

@@ -575,10 +575,7 @@ int HPL_pgmres
             tmp = w[k+1];
             /* store the current error */
             currenterror = fabs(tmp);
-            // HPL_barrier(GRID->all_comm);
-            // if (GRID->iam == 0)
-            // printf("Err: %.16f, start = %d\n", currenterror, start);fflush(stdout);
-            // HPL_barrier(GRID->all_comm); 
+
             /* check if the solution is good enough */
             if(currenterror < TOL)
             {
@@ -594,22 +591,9 @@ int HPL_pgmres
             --k;
         } 
 
-        // if (GRID->iam == 0)
-        // { 
-        //     printf("Before:\n");
-        //     printf("w = :\n");
-        //     print_vector(w, MM, 1); 
-        //     printf("R = :\n");
-        //     print_matrix(R, MM, MM, MM, 1);
-        // }
         /* solve Ry = w, R is upper-tri, and w will be overwritten by solution y */
         HPL_dtrsv(HplColumnMajor, HplUpper, HplNoTrans, HplNonUnit, k+1, R, MM, w, 1);
-        // if (GRID->iam == 0)
-        // {
-        //     printf("After:\n");
-        //     printf("w = :\n");
-        //     print_vector(w, MM, 1); 
-        // }
+
         /* calculate the new solution */
         for(i = 0; i <= k; ++i)
         {
@@ -635,61 +619,14 @@ int HPL_pgmres
             }
         }
 
-
-        // /* there is initial guess stored in x here from last iteration */
-        // /* calculate v = Ax */
-        // HPL_dgemv( HplColumnMajor, HplNoTrans, mp, nq, HPL_rone,
-        //         A->A, A->ld, x, 1, 0, v, 1 );
-        // HPL_all_reduce(v, mp, HPL_DOUBLE, HPL_sum, GRID->row_comm);
-
-        // /* preconditioning A */
-        // if (prec)
-        // {
-        //     if (GRID->mycol == tarcol)
-        //     {
-        //         memcpy(bptr, v, mp*sizeof(double));
-        //     }
-        //     HPL_pLdtrsv(GRID, factors);
-        //     redX2B(GRID, factors, factors->X, v);
-
-        //     if (GRID->mycol == tarcol)
-        //     {
-        //         memcpy(bptr, v, mp*sizeof(double));
-        //     }
-        //     HPL_pdtrsv(GRID, factors);
-        //     redX2B(GRID, factors, factors->X, v); 
-        // }
-
-        // norm = 0;
-        // /* v = rhs - v = rhs - Ax */
-        // for (i = 0; i < mp; ++i)
-        // {
-        //     v[i] = rhs[i] - v[i];
-        //     norm += v[i]*v[i];
-        // } 
-
-        // HPL_all_reduce(&norm, 1, HPL_DOUBLE, HPL_sum, GRID->col_comm);
-        // norm = sqrt(norm);
-
-        // HPL_barrier(GRID->all_comm);
-        // if (GRID->iam == 0)
-        //     printf("currenterror = %.16f, norm = %.16f\n", currenterror, norm);
-        // fflush(stdout);
-        // HPL_barrier(GRID->all_comm);
-
         /* if the error is small enough, stop. 
             otherwise another iteration will be initiated. */
         if(currenterror < TOL)
         {
             ready = 1;
         }
-
-        // printf("Restart!\n");
-        // fflush(stdout);
     }
 
-    // printf("Final! From process %d\n", GRID->iam);
-    // fflush(stdout);
     /* check if we have done maximum number of starts */
     if(start > MAXIT)
     {

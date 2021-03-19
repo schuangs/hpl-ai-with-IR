@@ -5,6 +5,8 @@
  * based on:
  *      Sec 3.1 of Matrix Computations  ---by H.Golub & F.Van Loan
  * 
+ * This function is not used in our implementation of HPL-AI:
+ *     https://github.com/wu-kan/HPL-AI/
  */
 
 # include "hpl.h"

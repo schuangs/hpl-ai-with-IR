@@ -21,23 +21,14 @@
 #define MM 50            /* restart size for GMRES */
 #define MAXIT 10        /* maximum number of GMRES iteration */
 
-#ifdef STDC_HEADERS
 void HPL_pir
 (
    HPL_T_grid *                     GRID,
    HPL_T_palg *                     ALGO,
    HPL_T_pdmat *                    A,
-   HPL_T_pmat *                     FA
-)
-#else
-void HPL_pir
-(GRID, ALGO, A, FA, MYROW, MYCOL, NPCOL)
-   HPL_T_grid *                     GRID;
-   HPL_T_palg *                     ALGO;
-   HPL_T_pdmat *                    A;
-   HPL_T_pmat *                     FA;
-#endif
-{
+   HPL_T_pmat *                     FA   /* HPL_T_pmat is similar to HPL_T_pdmat, 
+                                                   but in lower precision */
+) {
 /* 
  * Purpose
  * =======
@@ -62,8 +53,7 @@ void HPL_pir
  *         On entry, A points to the data structure containing the local
  *         array information. 
  * FA      (local input/output)          HPL_T_pmat *
- *         On entry, A points to the data structure containing the local
- *         array information. It serves as lower precision version if A.
+ *         On entry, it serves as lower precision version if A.
  *
  * ---------------------------------------------------------------------
  */ 

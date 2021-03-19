@@ -1,32 +1,57 @@
-==============================================================
- High Performance Computing Linpack Benchmark (HPL)
- HPL - 2.3 - December 2, 2018
-==============================================================
+This is the core part of the implementation of HPL-AI mix-precision benchmark.
 
- HPL is a software package that solves a (random) dense linear
- system  in   double  precision  (64   bits)   arithmetic   on 
- distributed-memory  computers.   It can thus be regarded as a
- portable as well as  freely  available implementation  of the
- High Performance Computing Linpack Benchmark.
+For the complete implementation of our HPL-AI benchmark, please go to:
+https://github.com/wu-kan/HPL-AI
 
- The  HPL  software  package requires the availibility on your
- system of an implementation of the  Message Passing Interface
- MPI  (1.1 compliant).  An  implementation of either the Basic
- Linear Algebra Subprograms  BLAS  or the  Vector Signal Image
- Processing Library VSIPL is also needed.  Machine-specific as
- well as generic implementations of MPI, the  BLAS  and  VSIPL
- are available for a large variety of systems.
+For the original implementation of HPL benchmark (HPL-2.3), which serves as the 
+base of our work, please reference:
+http://www.netlib.org/benchmark/hpl/index.html
 
- Install See the file INSTALL in this directory.
- -------
 
- Tuning  See the file TUNING in this directory.
- ------
+This repository includes:
 
- Bugs  Known  problems and bugs with this release are documen-
- ----  ted in the file hpl/BUGS.
+1. HPL_pir.c
 
- Check out  the website  www.netlib.org/benchmark/hpl  for the
- latest information.
+    A mix-precision parallel iterative refinement ( IR ) implementation tuned for HPL-AI.
 
-==============================================================
+    based on the paper:
+
+            A New  Analysis  Of Iterative Refinement And Its  Application To 
+            Accurate Solution Of Ill Conditioned Sparse Linear Systems
+
+        ---by Carson, Erin & Higham, Nicholas J., 2017
+
+2. HPL_pgmres.c
+
+    A parallel GMRES algorithm based on Householder transformation tuned for HPL-AI.
+
+    based on the implementation of parallel GMRES:
+
+            Parallelization Of The GMRES 
+
+        ---by Morgan Görtz, Lund University.
+
+    and the pioneer work implementing Householder Transformations into GMRES:
+
+            Implementation Of The GMRES Method Using Householder Transformations Method
+
+        ---by Homer F. Walker, 1988
+
+3. HPL_pLdtrsv.c
+
+    A parallel lower triangular system solver following the implementation of HPL_pdtrsv()
+     of HPL-2.3, which is a parallel upper triangular system solver.
+
+4. HPL_generate.c
+
+    A parallel matrix generation implementation for HPL-AI.
+
+    based on the paper:
+
+            Matrices with Tunable Infinity-Norm Condition Number
+            and No Need for Pivoting in LU Factorization
+
+        --- by Fasi Massimiliano and Higham Nicholas J.
+        [MIMS EPrint 2020.17, 
+        Manchester Institute for Mathematical Sciences,
+        The University of Manchester, UK, July 2020.]     
